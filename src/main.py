@@ -43,9 +43,6 @@ def configure(binder):
         entities=entities
     )
     
-    # Add welcome message
-    renderer.add_message("Welcome to Roguelike!")
-    
     # Configure dependency bindings
     binder.bind(GameState, to=game_state)
     binder.bind(InputHandler, to=InputHandler())

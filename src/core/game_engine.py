@@ -73,8 +73,19 @@ class GameEngine:
             return True
             
         if command == 'quit':
-            return False
+            # 途中終了時はスコアを記録しない
+            self.renderer.add_message("Really quit? (y/n)")
+            self.renderer.render(self.game_state)  # メッセージを表示
             
+            # y/nの入力を待つ
+            while True:
+                confirm = self.input_handler.get_command()
+                if confirm == 'y':
+                    return False
+                elif confirm == 'n':
+                    self.renderer.add_message("")  # メッセージをクリア
+                    return True
+        
         if command.startswith('move_'):
             self._handle_movement(command.split('_')[1])
         elif command in ['up', 'down']:
@@ -128,26 +139,28 @@ class GameEngine:
                 break
 
     def _show_game_over(self) -> None:
-        """Display game over screen and handle high score entry"""
+        """Display game over screen when player dies"""
         self.renderer.clear()
         
-        score = self.game_state.calculate_score()
+        score = self.game_state.calculate_score()  # Amuletボーナスなし
         gold = self.game_state.player.gold
         level = self.game_state.player.level
         depth = len(self.game_state.explored_levels)
         
+        # "You have died!" メッセージを表示
+        self.renderer.add_message("You have died!")
+        
         # Get player name
         name = self.renderer.get_player_name()
         
-        # Record score
-        rank = self.score_manager.add_score(name, score, gold, level, depth)
-        
-        # Show game over screen
-        self.renderer.show_game_over(
+        # 死亡時のスコアを記録
+        rank = self.score_manager.add_score(
+            name=name,
             score=score,
             gold=gold,
             level=level,
-            depth=depth
+            depth=depth,
+            victory=False
         )
         
         # Show high scores
@@ -188,37 +201,33 @@ class GameEngine:
         self.input_handler.get_command()
 
     def _show_victory(self) -> None:
-        """Display victory screen"""
-        print(self.terminal.clear)
+        """Display victory screen when player wins"""
+        self.renderer.clear()
         
-        messages = [
-            "Congratulations!",
-            "You have retrieved the Amulet of Yendor",
-            "and escaped from the dungeon!",
-            "",
-            f"Final Score: {self.game_state.calculate_score()}",
-            "",
-            "Enter your name: "
-        ]
+        # Amuletボーナス(20,000)を含むスコア計算
+        score = self.game_state.calculate_score()
+        gold = self.game_state.player.gold
+        level = self.game_state.player.level
+        depth = len(self.game_state.explored_levels)
         
-        y = (self.terminal.height - len(messages)) // 2
-        for i, msg in enumerate(messages):
-            x = (self.terminal.width - len(msg)) // 2
-            print(self.terminal.move(y + i, x) + msg, end='', flush=True)
+        # "You have won!" メッセージを表示
+        self.renderer.add_message("You have won!")
         
-        # 名前入力とスコア記録
-        name = input()[:15]
+        # Get player name
+        name = self.renderer.get_player_name()
+        
+        # 勝利時のスコアを記録
         rank = self.score_manager.add_score(
             name=name,
-            score=self.game_state.calculate_score(),
-            gold=self.game_state.player.gold,
-            level=self.game_state.player.level,
-            depth=len(self.game_state.explored_levels),
+            score=score,
+            gold=gold,
+            level=level,
+            depth=depth,
             victory=True
         )
         
-        # ハイスコア表示
-        self._show_high_scores(rank) 
+        # Show high scores
+        self._show_high_scores(rank)
 
     def _handle_stairs(self, direction: str) -> None:
         """Handle stair movement"""
