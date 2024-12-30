@@ -13,7 +13,7 @@ class AmuletOfYendor(Entity):
         super().__init__(
             x=x,
             y=y,
-            char='*',  # Special display character
+            char='"',  # Changed from '*' to '"' to match original Rogue
             name='Amulet of Yendor',
             blocks_movement=False
         ) 
