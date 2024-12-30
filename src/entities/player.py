@@ -6,7 +6,8 @@ from typing import Optional
 from entities.entity import Entity
 from core.map import GameMap, Room
 from utils.logger import get_logger
-from constants.game_constants import LEVEL_UP_CONFIG
+from constants.game_constants import LEVEL_UP_CONFIG, COMBAT_CONFIG
+import random
 
 logger = get_logger(__name__)
 
@@ -49,25 +50,53 @@ class Player(Entity):
     def level(self) -> int:
         return self.stats['level']
     
+    @level.setter
+    def level(self, value: int) -> None:
+        self.stats['level'] = value
+    
     @property
     def exp(self) -> int:
         return self.stats['exp']
+    
+    @exp.setter
+    def exp(self, value: int) -> None:
+        self.stats['exp'] = value
     
     @property
     def hp(self) -> int:
         return self.stats['hp']
     
+    @hp.setter
+    def hp(self, value: int) -> None:
+        self.stats['hp'] = value
+    
     @property
     def max_hp(self) -> int:
         return self.stats['max_hp']
+    
+    @max_hp.setter
+    def max_hp(self, value: int) -> None:
+        self.stats['max_hp'] = value
     
     @property
     def strength(self) -> int:
         return self.stats['strength']
     
+    @strength.setter
+    def strength(self, value: int) -> None:
+        self.stats['strength'] = value
+    
     @property
     def gold(self) -> int:
         return self.stats['gold']
+    
+    @property
+    def armor_class(self) -> int:
+        return self.stats['armor_class']
+    
+    @armor_class.setter
+    def armor_class(self, value: int) -> None:
+        self.stats['armor_class'] = value
 
     def move(self, dx: int, dy: int, game_map: GameMap) -> bool:
         """
@@ -243,7 +272,7 @@ class Player(Entity):
         Args:
             amount: Amount of experience to gain
         """
-        self.exp += amount
+        self.stats['exp'] += amount
         logger.info(f"Gained {amount} exp. Total: {self.exp}")
         
         # Check for level up
@@ -254,8 +283,42 @@ class Player(Entity):
         return self.level * LEVEL_UP_CONFIG['XP_MULTIPLIER']
 
     def _level_up(self) -> None:
+        """Handle level up"""
         self.level += 1
         self.max_hp += LEVEL_UP_CONFIG['HP_INCREASE']
         self.hp = self.max_hp
         self.strength += LEVEL_UP_CONFIG['STRENGTH_INCREASE']
-        logger.info(f"Level up! Now level {self.level}") 
+        logger.info(f"Level up! Now level {self.level}")
+
+    def attack(self, target: 'Monster') -> tuple[bool, int]:
+        """
+        Attack a monster
+        
+        Args:
+            target: Monster to attack
+            
+        Returns:
+            tuple[bool, int]: (hit success, damage dealt)
+        """
+        # Calculate hit chance
+        hit_chance = COMBAT_CONFIG['BASE_HIT_CHANCE'] + (
+            self.level * COMBAT_CONFIG['LEVEL_HIT_BONUS']
+        )
+        
+        # Check if attack hits
+        if random.random() > hit_chance:
+            return False, 0
+            
+        # Calculate damage
+        base_damage = random.randint(1, self.strength)
+        bonus_damage = int(self.strength * COMBAT_CONFIG['STRENGTH_DAMAGE_BONUS'])
+        total_damage = max(COMBAT_CONFIG['MIN_DAMAGE'], base_damage + bonus_damage)
+        
+        # Apply damage to target
+        target.take_damage(total_damage)
+        
+        # Grant experience if monster dies
+        if target.is_dead:
+            self.gain_exp(target.exp_value)
+        
+        return True, total_damage 

@@ -8,6 +8,39 @@ import random
 from utils.logger import get_logger
 from entities.entity import Entity
 from entities.stairs import Stairs
+from entities.monster import Monster
+from entities.monsters.bat import Bat
+from entities.monsters.snake import Snake
+from entities.monsters.hobgoblin import Hobgoblin
+from entities.monsters.centaur import Centaur
+from entities.monsters.ice_monster import IceMonster
+from entities.monsters.nymph import Nymph
+from entities.monsters.rust_monster import RustMonster
+from entities.monsters.zombie import Zombie
+from entities.monsters.troll import Troll
+from entities.monsters.yeti import Yeti
+from entities.monsters.wraith import Wraith
+from entities.monsters.vampire import Vampire
+from entities.monsters.dragon import Dragon
+from entities.monsters.aquator import Aquator
+from entities.monsters.leprechaun import Leprechaun
+from entities.monsters.phantom import Phantom
+from entities.monsters.griffin import Griffin
+from entities.monsters.medusa import Medusa
+from entities.monsters.umber_hulk import UmberHulk
+from entities.monsters.xorn import Xorn
+from entities.monsters.quagga import Quagga
+from entities.monsters.orc import Orc
+from entities.monsters.demon import Demon
+from entities.monsters.emu import Emu
+from entities.monsters.jabberwock import Jabberwock
+from entities.monsters.kestrel import Kestrel
+from constants.game_constants import (
+    MAP_CONFIG,
+    MONSTER_SPAWN_CONFIG,
+    MONSTERS_PER_ROOM,
+    GAME_RULES
+)
 
 logger = get_logger(__name__)
 
@@ -38,10 +71,10 @@ class Room:
 
 class GameMap:
     """Class managing the dungeon map"""
-    def __init__(self, width: int = 80, height: int = 21, level: int = 1):
+    def __init__(self, width: int = MAP_CONFIG['MIN_WIDTH'], height: int = MAP_CONFIG['MIN_HEIGHT'], level: int = 1):
         self.width = width
         self.height = height
-        self.level = level  # Current dungeon level
+        self.level = level
         self.tiles = self._initialize_tiles()
         self.rooms: List[Room] = []
         self.visible: Set[Tuple[int, int]] = set()
@@ -50,10 +83,10 @@ class GameMap:
         self.params = {
             'grid_width': 3,
             'grid_height': 3,
-            'min_room_width': 6,
-            'max_room_width': 9,
-            'min_room_height': 4,
-            'max_room_height': 7,
+            'min_room_width': MAP_CONFIG['MIN_ROOM_SIZE'],
+            'max_room_width': MAP_CONFIG['MAX_ROOM_SIZE'],
+            'min_room_height': MAP_CONFIG['MIN_ROOM_SIZE'],
+            'max_room_height': MAP_CONFIG['MAX_ROOM_SIZE'],
             'corridor_width': 1
         }
 
@@ -62,14 +95,8 @@ class GameMap:
         logger.info(f"Generating dungeon level {self.level}")
         self.rooms.clear()
         
-        # Calculate grid cell size
-        cell_width = (self.width - 2) // self.params['grid_width']
-        cell_height = (self.height - 3) // self.params['grid_height']
-        
-        # Place rooms
-        self._place_rooms(cell_width, cell_height)
-        
-        # Connect rooms with corridors
+        # Generate basic dungeon structure
+        self._place_rooms()
         self._connect_rooms()
         
         # Place entities
@@ -79,6 +106,10 @@ class GameMap:
         stairs = self._place_stairs()
         entities.extend(stairs)
         
+        # Place monsters
+        monsters = self._place_monsters()
+        entities.extend(monsters)
+        
         # Place gold
         gold_piles = self._place_gold()
         entities.extend(gold_piles)
@@ -87,40 +118,56 @@ class GameMap:
         if self.level == 26:
             from entities.amulet import AmuletOfYendor
             room = random.choice(self.rooms)
-            x = random.randint(room.x + 1, room.x + room.width - 2)
-            y = random.randint(room.y + 1, room.y + room.height - 2)
+            x, y = self._place_entity_in_room(room)
             amulet = AmuletOfYendor(x, y)
             entities.append(amulet)
-            logger.info("Placed Amulet of Yendor")
         
-        logger.info("Dungeon generation complete")
         return entities
 
-    def _place_rooms(self, cell_width: int, cell_height: int) -> None:
+    def _place_rooms(self) -> None:
         """Place rooms in the grid cells"""
+        # Calculate grid cell size
+        cell_width = (self.width - 2) // self.params['grid_width']
+        cell_height = (self.height - 3) // self.params['grid_height']
+        
         for i in range(self.params['grid_height']):
             for j in range(self.params['grid_width']):
                 self._place_room_in_cell(i, j, cell_width, cell_height)
 
     def _place_room_in_cell(self, i: int, j: int, cell_width: int, cell_height: int) -> None:
         """Place a room within a grid cell"""
-        # Determine room size
+        # 部屋のサイズに余裕を持たせる
+        max_room_width = min(
+            self.params['max_room_width'],
+            cell_width - 2  # 壁のための余裕
+        )
+        max_room_height = min(
+            self.params['max_room_height'],
+            cell_height - 2  # 壁のための余裕
+        )
+        
+        # 最小サイズが最大サイズを超えないようにする
         room_width = random.randint(
-            self.params['min_room_width'],
-            min(self.params['max_room_width'], cell_width - 2)
+            min(self.params['min_room_width'], max_room_width),
+            max_room_width
         )
         room_height = random.randint(
-            self.params['min_room_height'],
-            min(self.params['max_room_height'], cell_height - 2)
+            min(self.params['min_room_height'], max_room_height),
+            max_room_height
         )
         
-        # Determine room position within cell
+        # 部屋の位置を決定（セル内でランダム）
         cell_x = j * cell_width + 1
         cell_y = i * cell_height + 1
-        x = cell_x + random.randint(0, max(0, cell_width - room_width - 2))
-        y = cell_y + random.randint(0, max(0, cell_height - room_height - 2))
         
-        # Create and carve room
+        # 部屋の配置可能な範囲を計算
+        x_margin = cell_width - room_width - 1
+        y_margin = cell_height - room_height - 1
+        
+        x = cell_x + random.randint(0, max(0, x_margin))
+        y = cell_y + random.randint(0, max(0, y_margin))
+        
+        # 部屋を作成して追加
         new_room = Room(x, y, room_width, room_height)
         self._carve_room(new_room)
         self.rooms.append(new_room)
@@ -344,3 +391,71 @@ class GameMap:
             stairs.append(Stairs(x, y, 'down'))
         
         return stairs 
+
+    def _place_monsters(self) -> List[Monster]:
+        """Place monsters in rooms"""
+        monsters = []
+        monster_types = {
+            'BAT': Bat,
+            'SNAKE': Snake,
+            'HOBGOBLIN': Hobgoblin,
+            'CENTAUR': Centaur,
+            'ICE_MONSTER': IceMonster,
+            'NYMPH': Nymph,
+            'RUST_MONSTER': RustMonster,
+            'ZOMBIE': Zombie,
+            'TROLL': Troll,
+            'YETI': Yeti,
+            'WRAITH': Wraith,
+            'VAMPIRE': Vampire,
+            'DRAGON': Dragon,
+            'AQUATOR': Aquator,
+            'LEPRECHAUN': Leprechaun,
+            'PHANTOM': Phantom,
+            'GRIFFIN': Griffin,
+            'MEDUSA': Medusa,
+            'UMBER_HULK': UmberHulk,
+            'XORN': Xorn,
+            'QUAGGA': Quagga,
+            'ORC': Orc,
+            'DEMON': Demon,
+            'EMU': Emu,
+            'JABBERWOCK': Jabberwock,
+            'KESTREL': Kestrel
+        }
+        
+        # Get spawn table for current level
+        spawn_table = MONSTER_SPAWN_CONFIG.get(
+            self.level, 
+            MONSTER_SPAWN_CONFIG[1]  # デフォルトはレベル1の設定
+        )
+        
+        # For each room
+        for room in self.rooms[1:-1]:  # 最初と最後の部屋を除く
+            # Check if room should have monsters
+            if random.random() > MONSTERS_PER_ROOM['CHANCE']:
+                continue
+                
+            # Determine number of monsters
+            num_monsters = random.randint(
+                MONSTERS_PER_ROOM['MIN'],
+                MONSTERS_PER_ROOM['MAX']
+            )
+            
+            # Generate monsters
+            for _ in range(num_monsters):
+                # Choose monster type
+                monster_type, _ = random.choices(
+                    spawn_table, 
+                    weights=[w for _, w in spawn_table]
+                )[0]
+                
+                # Get position in room
+                x, y = self._place_entity_in_room(room)
+                
+                # Create and add monster
+                monster_class = monster_types[monster_type]
+                monster = monster_class(x, y)
+                monsters.append(monster)
+                
+        return monsters 

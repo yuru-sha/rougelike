@@ -14,6 +14,7 @@ from utils.score_manager import ScoreManager
 from entities.gold import Gold  # 追加
 from entities.amulet import AmuletOfYendor  # 追加
 from entities.stairs import Stairs
+from entities.monster import Monster  # 追加
 
 logger = get_logger(__name__)
 
@@ -99,8 +100,63 @@ class GameEngine:
             return
             
         dx, dy = self.movement_vectors[direction]
-        if self.game_state.player.move(dx, dy, self.game_state.current_map):
+        player = self.game_state.player
+        new_x = player.x + dx
+        new_y = player.y + dy
+        
+        # Check for monsters at destination
+        monster = self._get_monster_at(new_x, new_y)
+        if monster:
+            self._handle_combat(monster)
+            return
+        
+        # If no monster, try to move
+        if player.move(dx, dy, self.game_state.current_map):
             self._check_pickup()
+
+    def _get_monster_at(self, x: int, y: int) -> Optional[Monster]:
+        """Get monster at specified position"""
+        for entity in self.game_state.entities:
+            if (isinstance(entity, Monster) and 
+                entity.x == x and 
+                entity.y == y and 
+                not entity.is_dead):
+                return entity
+        return None
+
+    def _handle_combat(self, monster: Monster) -> None:
+        """Handle combat between player and monster"""
+        # Player attacks monster
+        hit, damage = self.game_state.player.attack(monster)
+        
+        if hit:
+            self.renderer.add_message(
+                f"You hit the {monster.name} for {damage} damage!"
+            )
+            if monster.is_dead:
+                self.renderer.add_message(
+                    f"You have defeated the {monster.name}!"
+                )
+                return
+        else:
+            self.renderer.add_message(
+                f"You miss the {monster.name}."
+            )
+        
+        # Monster counterattacks if still alive
+        hit, damage = monster.attack(self.game_state.player)
+        
+        if hit:
+            self.renderer.add_message(
+                f"The {monster.name} hits you for {damage} damage!"
+            )
+            if self.game_state.player.is_dead:
+                self.renderer.add_message("You have died!")
+                return
+        else:
+            self.renderer.add_message(
+                f"The {monster.name} misses you."
+            )
 
     def _check_pickup(self) -> None:
         """Check for and handle item pickup at player's position"""
