@@ -14,21 +14,26 @@ from utils.logger import get_logger
 logger = get_logger(__name__)
 
 def configure(binder):
-    """Configure dependency injection"""
+    """
+    Configure dependency injection bindings
+    
+    Args:
+        binder: Injector binder instance
+    """
     # Initialize renderer
     renderer = Renderer()
     
-    # Generate map
+    # Generate initial map
     game_map = GameMap()
     entities = game_map.generate()
     
-    # Create player
+    # Create player at first room center
     player = Player(
         x=game_map.rooms[0].center[0],
         y=game_map.rooms[0].center[1]
     )
     
-    # Initialize player's FOV
+    # Initialize player's field of view
     player._update_fov(game_map)
     
     # Create initial game state
@@ -41,19 +46,22 @@ def configure(binder):
     # Add welcome message
     renderer.add_message("Welcome to Roguelike!")
     
-    # 依存関係の設定
+    # Configure dependency bindings
     binder.bind(GameState, to=game_state)
     binder.bind(InputHandler, to=InputHandler())
     binder.bind(Renderer, to=renderer)
 
 def main():
-    """ゲームのエントリーポイント"""
+    """
+    Game entry point
+    Sets up dependency injection and starts game
+    """
     logger.info("Starting Rogue game")
     
-    # DIコンテナの設定
+    # Setup DI container
     injector = Injector(configure)
     
-    # ゲームエンジンの取得と実行
+    # Get and run game engine
     game = injector.get(GameEngine)
     game.run()
 
