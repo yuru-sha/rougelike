@@ -37,13 +37,13 @@ PLAYER_STATS = {
     'BASE_HP': 12,
     'BASE_STRENGTH': 16,
     'BASE_ARMOR': 0,
-    'MAX_LEVEL': 20,
+    'MAX_LEVEL': 21,
 }
 
 # Experience points needed for each level
 XP_REQUIREMENTS = {
-    level: level * 1000
-    for level in range(1, 21)
+    level: level * 10000
+    for level in range(1, 22)
 }
 
 # Colors using blessed/terminal
@@ -54,4 +54,12 @@ COLORS = {
     'GOLD': 'yellow',
     'AMULET': 'bright_magenta',
     'STAIRS': 'bright_cyan',
+}
+
+# Gold generation
+GOLD_CONFIG = {
+    'MIN_AMOUNT': 2,      # Minimum gold per pile
+    'MAX_AMOUNT': 250,    # Maximum gold per pile
+    'MIN_PILES': 2,       # Minimum piles per level
+    'MAX_PILES': 4        # Maximum piles per level
 } 
