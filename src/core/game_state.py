@@ -7,6 +7,7 @@ from typing import List, Dict, Set
 from entities.entity import Entity
 from entities.player import Player
 from core.map import GameMap
+from constants.game_constants import SCORE_CONFIG
 
 @dataclass
 class GameState:
@@ -36,9 +37,9 @@ class GameState:
             int: Total score based on gold, level, depth and amulet
         """
         gold_score = self.player.gold
-        level_score = self.player.level * 1000
-        depth_score = len(self.explored_levels) * 500
-        amulet_bonus = 20000 if self.has_amulet else 0  # Bonus for obtaining Amulet
+        level_score = self.player.level * SCORE_CONFIG['LEVEL_MULTIPLIER']
+        depth_score = len(self.explored_levels) * SCORE_CONFIG['DEPTH_MULTIPLIER']
+        amulet_bonus = SCORE_CONFIG['AMULET_BONUS'] if self.has_amulet else 0
         
         total_score = gold_score + level_score + depth_score + amulet_bonus
         return total_score

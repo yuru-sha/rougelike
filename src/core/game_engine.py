@@ -129,25 +129,26 @@ class GameEngine:
 
     def _show_game_over(self) -> None:
         """Display game over screen and handle high score entry"""
+        self.renderer.clear()
+        
         score = self.game_state.calculate_score()
         gold = self.game_state.player.gold
         level = self.game_state.player.level
         depth = len(self.game_state.explored_levels)
         
         # Get player name
-        print(self.terminal.clear)
-        print(self.terminal.move(self.terminal.height // 2 - 5, self.terminal.width // 2 - 10))
-        print("Enter your name: ", end='', flush=True)
-        
-        # Clear input buffer
-        import sys, termios, tty
-        termios.tcflush(sys.stdin, termios.TCIOFLUSH)
-        
-        # Get name (max 15 chars)
-        name = input()[:15]
+        name = self.renderer.get_player_name()
         
         # Record score
         rank = self.score_manager.add_score(name, score, gold, level, depth)
+        
+        # Show game over screen
+        self.renderer.show_game_over(
+            score=score,
+            gold=gold,
+            level=level,
+            depth=depth
+        )
         
         # Show high scores
         self._show_high_scores(rank)

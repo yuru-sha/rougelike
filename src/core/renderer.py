@@ -114,3 +114,57 @@ class Renderer:
         # 最新の10件のメッセージを保持
         if len(self.screen_buffer) > 10:
             self.screen_buffer.pop(0) 
+
+    def clear(self) -> None:
+        """Clear the terminal screen"""
+        print(self.terminal.clear)
+
+    def get_player_name(self) -> str:
+        """
+        Get player name input
+        
+        Returns:
+            str: Player name (max 15 chars)
+        """
+        print(self.terminal.move(self.terminal.height // 2 - 5, self.terminal.width // 2 - 10))
+        print("Enter your name: ", end='', flush=True)
+        
+        # Clear input buffer
+        import sys, termios, tty
+        termios.tcflush(sys.stdin, termios.TCIOFLUSH)
+        
+        # Get name (max 15 chars)
+        return input()[:15] 
+
+    def show_game_over(self, score: int, gold: int, level: int, depth: int) -> None:
+        """
+        Display game over screen
+        
+        Args:
+            score: Final score
+            gold: Gold collected
+            level: Player level
+            depth: Maximum dungeon depth reached
+        """
+        self.clear()
+        
+        messages = [
+            "GAME OVER",
+            "=" * 40,
+            f"Final Score: {score}",
+            f"Gold: {gold}",
+            f"Level: {level}",
+            f"Max Depth: {depth}",
+            "-" * 40,
+            "",
+            "Press any key to continue..."
+        ]
+        
+        # Display messages in center of screen
+        y = (self.terminal.height - len(messages)) // 2
+        for i, msg in enumerate(messages):
+            x = (self.terminal.width - len(msg)) // 2
+            print(self.terminal.move(y + i, x) + msg)
+        
+        # Wait for key press
+        self.terminal.inkey() 

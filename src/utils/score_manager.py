@@ -23,31 +23,41 @@ class ScoreManager:
         self.max_scores = max_scores
         self._ensure_scores_file()
 
-    def add_score(self, score: int, player_name: str) -> None:
+    def add_score(self, name: str, score: int, gold: int, level: int, depth: int) -> int:
         """
-        Add a new high score entry
+        Add new score and return ranking position
         
         Args:
-            score: Player's final score
-            player_name: Name of the player
+            name: Player name
+            score: Total score
+            gold: Gold collected
+            level: Player level
+            depth: Maximum dungeon depth reached
+            
+        Returns:
+            int: Ranking position (1-based)
         """
-        scores = self._load_scores()
-        
-        # Create new score entry
         new_score = {
+            'name': name,
             'score': score,
-            'player': player_name,
-            'date': datetime.now().isoformat()
+            'gold': gold,
+            'level': level,
+            'depth': depth,
+            'date': datetime.now().strftime('%Y-%m-%d %H:%M')
         }
         
-        scores.append(new_score)
-        scores.sort(key=lambda x: x['score'], reverse=True)
+        # Binary search for insertion position
+        position = self._find_insertion_position(score)
         
-        # Keep only top scores
+        # Insert score and maintain top scores
+        scores = self._load_scores()
+        scores.insert(position, new_score)
         scores = scores[:self.max_scores]
         
         self._save_scores(scores)
-        logger.info(f"Added new score: {score} by {player_name}")
+        logger.info(f"Added score: {score} by {name} (rank: {position + 1})")
+        
+        return position + 1
 
     def get_high_scores(self) -> List[Dict]:
         """
@@ -79,3 +89,25 @@ class ScoreManager:
                 json.dump(scores, f, indent=2)
         except IOError as e:
             logger.error(f"Error saving scores to {self.scores_file}: {e}") 
+
+    def _find_insertion_position(self, score: int) -> int:
+        """
+        Binary search for score insertion position
+        
+        Args:
+            score: Score to insert
+            
+        Returns:
+            int: Index where score should be inserted
+        """
+        scores = self._load_scores()
+        left, right = 0, len(scores)
+        
+        while left < right:
+            mid = (left + right) // 2
+            if scores[mid]['score'] > score:  # 降順でソート
+                left = mid + 1
+            else:
+                right = mid
+                
+        return left 
