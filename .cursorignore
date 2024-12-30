@@ -1,0 +1,24 @@
+# Cursor ignore file
+# See https://cursor.sh/docs/ignore for documentation
+logs/
+__pycache__/
+.pytest_cache/
+*.py[cod]
+.coverage
+htmlcov/
+.env
+.venv/
+env/
+venv/
+ENV/
+*.log
+data/scores.json
+.DS_Store
+*.swp
+*.swo
+.idea/
+.vscode/
+*.egg-info/
+dist/
+build/
+
