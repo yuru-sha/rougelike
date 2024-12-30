@@ -2,6 +2,7 @@
 Map generation and management for Rogue
 Implements traditional dungeon generation algorithms
 """
+
 from dataclasses import dataclass
 from typing import List, Set, Tuple, Optional
 import random
@@ -39,14 +40,16 @@ from constants.game_constants import (
     MAP_CONFIG,
     MONSTER_SPAWN_CONFIG,
     MONSTERS_PER_ROOM,
-    GAME_RULES
+    GAME_RULES,
 )
 
 logger = get_logger(__name__)
 
+
 @dataclass
 class Room:
     """Data class representing a room in the dungeon"""
+
     x: int
     y: int
     width: int
@@ -55,123 +58,126 @@ class Room:
     @property
     def center(self) -> Tuple[int, int]:
         """Returns the center coordinates of the room"""
-        return (
-            self.x + self.width // 2,
-            self.y + self.height // 2
-        )
-    
-    def intersects(self, other: 'Room') -> bool:
+        return (self.x + self.width // 2, self.y + self.height // 2)
+
+    def intersects(self, other: "Room") -> bool:
         """Check if this room intersects with another room"""
         return (
-            self.x <= other.x + other.width and
-            self.x + self.width >= other.x and
-            self.y <= other.y + other.height and
-            self.y + self.height >= other.y
+            self.x <= other.x + other.width
+            and self.x + self.width >= other.x
+            and self.y <= other.y + other.height
+            and self.y + self.height >= other.y
         )
+
 
 class GameMap:
     """Class managing the dungeon map"""
-    def __init__(self, width: int = MAP_CONFIG['MIN_WIDTH'], height: int = MAP_CONFIG['MIN_HEIGHT'], level: int = 1):
+
+    def __init__(
+        self,
+        width: int = MAP_CONFIG["MIN_WIDTH"],
+        height: int = MAP_CONFIG["MIN_HEIGHT"],
+        level: int = 1,
+    ):
         self.width = width
         self.height = height
         self.level = level
         self.tiles = self._initialize_tiles()
         self.rooms: List[Room] = []
         self.visible: Set[Tuple[int, int]] = set()
-        
+
         # Map generation parameters
         self.params = {
-            'grid_width': 3,
-            'grid_height': 3,
-            'min_room_width': MAP_CONFIG['MIN_ROOM_SIZE'],
-            'max_room_width': MAP_CONFIG['MAX_ROOM_SIZE'],
-            'min_room_height': MAP_CONFIG['MIN_ROOM_SIZE'],
-            'max_room_height': MAP_CONFIG['MAX_ROOM_SIZE'],
-            'corridor_width': 1
+            "grid_width": 3,
+            "grid_height": 3,
+            "min_room_width": MAP_CONFIG["MIN_ROOM_SIZE"],
+            "max_room_width": MAP_CONFIG["MAX_ROOM_SIZE"],
+            "min_room_height": MAP_CONFIG["MIN_ROOM_SIZE"],
+            "max_room_height": MAP_CONFIG["MAX_ROOM_SIZE"],
+            "corridor_width": 1,
         }
 
     def generate(self) -> List[Entity]:
         """Generate dungeon level"""
         logger.info(f"Generating dungeon level {self.level}")
         self.rooms.clear()
-        
+
         # Generate basic dungeon structure
         self._place_rooms()
         self._connect_rooms()
-        
+
         # Place entities
         entities = []
-        
+
         # Place stairs
         stairs = self._place_stairs()
         entities.extend(stairs)
-        
+
         # Place monsters
         monsters = self._place_monsters()
         entities.extend(monsters)
-        
+
         # Place gold
         gold_piles = self._place_gold()
         entities.extend(gold_piles)
-        
+
         # Place Amulet in deep levels
         if self.level == 26:
             from entities.amulet import AmuletOfYendor
+
             room = random.choice(self.rooms)
             x, y = self._place_entity_in_room(room)
             amulet = AmuletOfYendor(x, y)
             entities.append(amulet)
-        
+
         return entities
 
     def _place_rooms(self) -> None:
         """Place rooms in the grid cells"""
         # Calculate grid cell size
-        cell_width = (self.width - 2) // self.params['grid_width']
-        cell_height = (self.height - 3) // self.params['grid_height']
-        
-        for i in range(self.params['grid_height']):
-            for j in range(self.params['grid_width']):
+        cell_width = (self.width - 2) // self.params["grid_width"]
+        cell_height = (self.height - 3) // self.params["grid_height"]
+
+        for i in range(self.params["grid_height"]):
+            for j in range(self.params["grid_width"]):
                 self._place_room_in_cell(i, j, cell_width, cell_height)
 
-    def _place_room_in_cell(self, i: int, j: int, cell_width: int, cell_height: int) -> None:
+    def _place_room_in_cell(
+        self, i: int, j: int, cell_width: int, cell_height: int
+    ) -> None:
         """Place a room within a grid cell"""
         # 部屋のサイズに余裕を持たせる
         max_room_width = min(
-            self.params['max_room_width'],
-            cell_width - 2  # 壁のための余裕
+            self.params["max_room_width"], cell_width - 2  # 壁のための余裕
         )
         max_room_height = min(
-            self.params['max_room_height'],
-            cell_height - 2  # 壁のための余裕
+            self.params["max_room_height"], cell_height - 2  # 壁のための余裕
         )
-        
+
         # 最小サイズが最大サイズを超えないようにする
         room_width = random.randint(
-            min(self.params['min_room_width'], max_room_width),
-            max_room_width
+            min(self.params["min_room_width"], max_room_width), max_room_width
         )
         room_height = random.randint(
-            min(self.params['min_room_height'], max_room_height),
-            max_room_height
+            min(self.params["min_room_height"], max_room_height), max_room_height
         )
-        
+
         # 部屋の位置を決定（セル内でランダム）
         cell_x = j * cell_width + 1
         cell_y = i * cell_height + 1
-        
+
         # 部屋の配置可能な範囲を計算
         x_margin = cell_width - room_width - 1
         y_margin = cell_height - room_height - 1
-        
+
         x = cell_x + random.randint(0, max(0, x_margin))
         y = cell_y + random.randint(0, max(0, y_margin))
-        
+
         # 部屋を作成して追加
         new_room = Room(x, y, room_width, room_height)
         self._carve_room(new_room)
         self.rooms.append(new_room)
-        
+
         logger.debug(f"Room placed at ({x}, {y}) of size {room_width}x{room_height}")
 
     def _connect_rooms(self) -> None:
@@ -183,7 +189,7 @@ class GameMap:
         """Connect two rooms with a corridor"""
         x1, y1 = room1.center
         x2, y2 = room2.center
-        
+
         # Generate L-shaped corridor
         if random.random() < 0.5:
             self._create_horizontal_tunnel(x1, x2, y1)
@@ -194,10 +200,7 @@ class GameMap:
 
     def is_walkable(self, x: int, y: int) -> bool:
         """Check if a position is walkable"""
-        return (
-            self.is_in_bounds(x, y) and 
-            self.tiles[y][x] in ['.', '#']
-        )
+        return self.is_in_bounds(x, y) and self.tiles[y][x] in [".", "#"]
 
     def is_in_bounds(self, x: int, y: int) -> bool:
         """Check if coordinates are within map bounds"""
@@ -212,142 +215,142 @@ class GameMap:
         for y in range(room.y, room.y + room.height):
             for x in range(room.x, room.x + room.width):
                 if y == room.y or y == room.y + room.height - 1:
-                    self.tiles[y][x] = '-'
+                    self.tiles[y][x] = "-"
                 elif x == room.x or x == room.x + room.width - 1:
-                    self.tiles[y][x] = '|'
+                    self.tiles[y][x] = "|"
                 else:
-                    self.tiles[y][x] = '.'
+                    self.tiles[y][x] = "."
 
     def _create_horizontal_tunnel(self, x1: int, x2: int, y: int) -> None:
         """水平方向の通路を生成"""
         for x in range(min(x1, x2), max(x1, x2) + 1):
-            self.tiles[y][x] = '.'
+            self.tiles[y][x] = "."
             # 通路の上下に壁を配置
-            if self.tiles[y-1][x] == ' ':
-                self.tiles[y-1][x] = '-'
-            if self.tiles[y+1][x] == ' ':
-                self.tiles[y+1][x] = '-'
+            if self.tiles[y - 1][x] == " ":
+                self.tiles[y - 1][x] = "-"
+            if self.tiles[y + 1][x] == " ":
+                self.tiles[y + 1][x] = "-"
 
     def _create_vertical_tunnel(self, y1: int, y2: int, x: int) -> None:
         """垂直方向の通路を生成"""
         for y in range(min(y1, y2), max(y1, y2) + 1):
-            self.tiles[y][x] = '.'
+            self.tiles[y][x] = "."
             # 通路の左右に壁を配置
-            if self.tiles[y][x-1] == ' ':
-                self.tiles[y][x-1] = '|'
-            if self.tiles[y][x+1] == ' ':
-                self.tiles[y][x+1] = '|'
+            if self.tiles[y][x - 1] == " ":
+                self.tiles[y][x - 1] = "|"
+            if self.tiles[y][x + 1] == " ":
+                self.tiles[y][x + 1] = "|"
 
     def _initialize_tiles(self) -> List[List[str]]:
         """マップを壁で初期化"""
-        return [[' ' for x in range(self.width)] for y in range(self.height)]
+        return [[" " for x in range(self.width)] for y in range(self.height)]
 
     def _create_horizontal_passage(self, room1: Room, room2: Room) -> None:
         """水平方向の通路を生成"""
         x1 = room1.x + room1.width - 1
         x2 = room2.x
-        
+
         # 部屋の重なりがある場合の処理
         y_min = max(room1.y + 1, room2.y + 1)
         y_max = min(room1.y + room1.height - 2, room2.y + room2.height - 2)
-        
+
         if y_min > y_max:
             # 部屋が上下に離れている場合は中間点を使用
             y = (room1.y + room1.height // 2 + room2.y + room2.height // 2) // 2
         else:
             y = random.randint(y_min, y_max)
-        
+
         # 通路を生成
         for x in range(x1, x2 + 1):
-            self.tiles[y][x] = '.'
+            self.tiles[y][x] = "."
             # 通路の上下に壁を配置
-            if self.tiles[y-1][x] == ' ':
-                self.tiles[y-1][x] = '-'
-            if self.tiles[y+1][x] == ' ':
-                self.tiles[y+1][x] = '-'
+            if self.tiles[y - 1][x] == " ":
+                self.tiles[y - 1][x] = "-"
+            if self.tiles[y + 1][x] == " ":
+                self.tiles[y + 1][x] = "-"
 
     def _create_vertical_passage(self, room1: Room, room2: Room) -> None:
         """垂直方向の通路を生成"""
         y1 = room1.y + room1.height - 1
         y2 = room2.y
-        
+
         # 部屋の重なりがある場合の処理
         x_min = max(room1.x + 1, room2.x + 1)
         x_max = min(room1.x + room1.width - 2, room2.x + room2.width - 2)
-        
+
         if x_min > x_max:
             # 部屋が左右に離れている場合は中間点を使用
             x = (room1.x + room1.width // 2 + room2.x + room2.width // 2) // 2
         else:
             x = random.randint(x_min, x_max)
-        
+
         # 通路を生成
         for y in range(y1, y2 + 1):
-            self.tiles[y][x] = '.'
+            self.tiles[y][x] = "."
             # 通路の左右に壁を配置
-            if self.tiles[y][x-1] == ' ':
-                self.tiles[y][x-1] = '|'
-            if self.tiles[y][x+1] == ' ':
-                self.tiles[y][x+1] = '|'
+            if self.tiles[y][x - 1] == " ":
+                self.tiles[y][x - 1] = "|"
+            if self.tiles[y][x + 1] == " ":
+                self.tiles[y][x + 1] = "|"
 
     def _create_horizontal_passage(self, room1: Room, room2: Room) -> None:
         """水平方向の通路を生成"""
         x1 = room1.x + room1.width - 1
         x2 = room2.x
-        
+
         # 部屋の重なりがある場合の処理
         y_min = max(room1.y + 1, room2.y + 1)
         y_max = min(room1.y + room1.height - 2, room2.y + room2.height - 2)
-        
+
         if y_min > y_max:
             # 部屋が上下に離れている場合は中間点を使用
             y = (room1.y + room1.height // 2 + room2.y + room2.height // 2) // 2
         else:
             y = random.randint(y_min, y_max)
-        
+
         # 通路を生成
         for x in range(x1, x2 + 1):
-            self.tiles[y][x] = '.'
+            self.tiles[y][x] = "."
             # 通路の上下に壁を配置
-            if self.tiles[y-1][x] == ' ':
-                self.tiles[y-1][x] = '-'
-            if self.tiles[y+1][x] == ' ':
-                self.tiles[y+1][x] = '-'
+            if self.tiles[y - 1][x] == " ":
+                self.tiles[y - 1][x] = "-"
+            if self.tiles[y + 1][x] == " ":
+                self.tiles[y + 1][x] = "-"
 
     def _create_vertical_passage(self, room1: Room, room2: Room) -> None:
         """垂直方向の通路を生成"""
         y1 = room1.y + room1.height - 1
         y2 = room2.y
-        
+
         # 部屋の重なりがある場合の処理
         x_min = max(room1.x + 1, room2.x + 1)
         x_max = min(room1.x + room1.width - 2, room2.x + room2.width - 2)
-        
+
         if x_min > x_max:
             # 部屋が左右に離れている場合は中間点を使用
             x = (room1.x + room1.width // 2 + room2.x + room2.width // 2) // 2
         else:
             x = random.randint(x_min, x_max)
-        
+
         # 通路を生成
         for y in range(y1, y2 + 1):
-            self.tiles[y][x] = '.'
+            self.tiles[y][x] = "."
             # 通路の左右に壁を配置
-            if self.tiles[y][x-1] == ' ':
-                self.tiles[y][x-1] = '|'
-            if self.tiles[y][x+1] == ' ':
-                self.tiles[y][x+1] = '|'
+            if self.tiles[y][x - 1] == " ":
+                self.tiles[y][x - 1] = "|"
+            if self.tiles[y][x + 1] == " ":
+                self.tiles[y][x + 1] = "|"
 
     def _carve_room(self, room: Room) -> None:
         """部屋を掘る"""
         for y in range(room.y, room.y + room.height):
             for x in range(room.x, room.x + room.width):
                 if y == room.y or y == room.y + room.height - 1:
-                    self.tiles[y][x] = '-'
+                    self.tiles[y][x] = "-"
                 elif x == room.x or x == room.x + room.width - 1:
-                    self.tiles[y][x] = '|'
+                    self.tiles[y][x] = "|"
                 else:
-                    self.tiles[y][x] = '.'
+                    self.tiles[y][x] = "."
 
     def get_tile_char(self, x: int, y: int) -> str:
         """指定位置のタイル文字を取得"""
@@ -356,106 +359,100 @@ class GameMap:
     def is_walkable(self, x: int, y: int) -> bool:
         """指定位置が歩行可能か判定"""
         if 0 <= x < self.width and 0 <= y < self.height:
-            return self.tiles[y][x] in '.#'
-        return False 
+            return self.tiles[y][x] in ".#"
+        return False
 
     def _place_entity_in_room(self, room: Room) -> Tuple[int, int]:
         """Get random position in room for entity placement"""
         return (
             random.randint(room.x + 1, room.x + room.width - 2),
-            random.randint(room.y + 1, room.y + room.height - 2)
+            random.randint(room.y + 1, room.y + room.height - 2),
         )
 
-    def _place_gold(self) -> List['Gold']:
+    def _place_gold(self) -> List["Gold"]:
         """Place gold piles in rooms"""
         from entities.gold import Gold
-        
+
         gold_count = random.randint(2, 4)
         available_rooms = random.sample(self.rooms, gold_count)
-        
-        return [
-            Gold(*self._place_entity_in_room(room))
-            for room in available_rooms
-        ]
+
+        return [Gold(*self._place_entity_in_room(room)) for room in available_rooms]
 
     def _place_stairs(self) -> List[Stairs]:
         """Place stairs in the dungeon"""
         stairs = []
-        
+
         if self.level > 1:
             x, y = self._place_entity_in_room(self.rooms[0])
-            stairs.append(Stairs(x, y, 'up'))
-        
+            stairs.append(Stairs(x, y, "up"))
+
         if self.level < 26:
             x, y = self._place_entity_in_room(self.rooms[-1])
-            stairs.append(Stairs(x, y, 'down'))
-        
-        return stairs 
+            stairs.append(Stairs(x, y, "down"))
+
+        return stairs
 
     def _place_monsters(self) -> List[Monster]:
         """Place monsters in rooms"""
         monsters = []
         monster_types = {
-            'BAT': Bat,
-            'SNAKE': Snake,
-            'HOBGOBLIN': Hobgoblin,
-            'CENTAUR': Centaur,
-            'ICE_MONSTER': IceMonster,
-            'NYMPH': Nymph,
-            'RUST_MONSTER': RustMonster,
-            'ZOMBIE': Zombie,
-            'TROLL': Troll,
-            'YETI': Yeti,
-            'WRAITH': Wraith,
-            'VAMPIRE': Vampire,
-            'DRAGON': Dragon,
-            'AQUATOR': Aquator,
-            'LEPRECHAUN': Leprechaun,
-            'PHANTOM': Phantom,
-            'GRIFFIN': Griffin,
-            'MEDUSA': Medusa,
-            'UMBER_HULK': UmberHulk,
-            'XORN': Xorn,
-            'QUAGGA': Quagga,
-            'ORC': Orc,
-            'DEMON': Demon,
-            'EMU': Emu,
-            'JABBERWOCK': Jabberwock,
-            'KESTREL': Kestrel
+            "BAT": Bat,
+            "SNAKE": Snake,
+            "HOBGOBLIN": Hobgoblin,
+            "CENTAUR": Centaur,
+            "ICE_MONSTER": IceMonster,
+            "NYMPH": Nymph,
+            "RUST_MONSTER": RustMonster,
+            "ZOMBIE": Zombie,
+            "TROLL": Troll,
+            "YETI": Yeti,
+            "WRAITH": Wraith,
+            "VAMPIRE": Vampire,
+            "DRAGON": Dragon,
+            "AQUATOR": Aquator,
+            "LEPRECHAUN": Leprechaun,
+            "PHANTOM": Phantom,
+            "GRIFFIN": Griffin,
+            "MEDUSA": Medusa,
+            "UMBER_HULK": UmberHulk,
+            "XORN": Xorn,
+            "QUAGGA": Quagga,
+            "ORC": Orc,
+            "DEMON": Demon,
+            "EMU": Emu,
+            "JABBERWOCK": Jabberwock,
+            "KESTREL": Kestrel,
         }
-        
+
         # Get spawn table for current level
         spawn_table = MONSTER_SPAWN_CONFIG.get(
-            self.level, 
-            MONSTER_SPAWN_CONFIG[1]  # デフォルトはレベル1の設定
+            self.level, MONSTER_SPAWN_CONFIG[1]  # デフォルトはレベル1の設定
         )
-        
+
         # For each room
         for room in self.rooms[1:-1]:  # 最初と最後の部屋を除く
             # Check if room should have monsters
-            if random.random() > MONSTERS_PER_ROOM['CHANCE']:
+            if random.random() > MONSTERS_PER_ROOM["CHANCE"]:
                 continue
-                
+
             # Determine number of monsters
             num_monsters = random.randint(
-                MONSTERS_PER_ROOM['MIN'],
-                MONSTERS_PER_ROOM['MAX']
+                MONSTERS_PER_ROOM["MIN"], MONSTERS_PER_ROOM["MAX"]
             )
-            
+
             # Generate monsters
             for _ in range(num_monsters):
                 # Choose monster type
                 monster_type, _ = random.choices(
-                    spawn_table, 
-                    weights=[w for _, w in spawn_table]
+                    spawn_table, weights=[w for _, w in spawn_table]
                 )[0]
-                
+
                 # Get position in room
                 x, y = self._place_entity_in_room(room)
-                
+
                 # Create and add monster
                 monster_class = monster_types[monster_type]
                 monster = monster_class(x, y)
                 monsters.append(monster)
-                
-        return monsters 
+
+        return monsters

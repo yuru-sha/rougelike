@@ -1,6 +1,7 @@
 """
 Game state management
 """
+
 from dataclasses import dataclass
 from typing import List, Set
 from entities.player import Player
@@ -8,9 +9,11 @@ from core.map import GameMap
 from entities.entity import Entity
 from constants.game_constants import SCORE_CONFIG
 
+
 @dataclass
 class GameState:
     """Game state container"""
+
     player: Player
     current_map: GameMap
     entities: List[Entity]
@@ -25,12 +28,12 @@ class GameState:
     def calculate_score(self) -> int:
         """Calculate final score"""
         score = (
-            self.player.gold +
-            self.player.level * SCORE_CONFIG['LEVEL_MULTIPLIER'] +
-            len(self.explored_levels) * SCORE_CONFIG['DEPTH_MULTIPLIER']
+            self.player.gold
+            + self.player.level * SCORE_CONFIG["LEVEL_MULTIPLIER"]
+            + len(self.explored_levels) * SCORE_CONFIG["DEPTH_MULTIPLIER"]
         )
         if self.has_amulet:
-            score += SCORE_CONFIG['AMULET_BONUS']
+            score += SCORE_CONFIG["AMULET_BONUS"]
         return score
 
     def check_victory(self) -> bool:
@@ -39,4 +42,4 @@ class GameState:
 
     def add_explored_level(self, level: int) -> None:
         """Add level to explored levels set"""
-        self.explored_levels.add(level) 
+        self.explored_levels.add(level)
