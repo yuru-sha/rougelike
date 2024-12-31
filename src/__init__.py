@@ -1,3 +1,3 @@
 """
 Rogue game package
-""" 
+"""
