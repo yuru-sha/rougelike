@@ -6,7 +6,6 @@ from typing import Optional
 from entities.entity import Entity
 from core.map import GameMap, Room
 from utils.logger import get_logger
-from constants.game_constants import LEVEL_UP_CONFIG
 
 logger = get_logger(__name__)
 
@@ -251,11 +250,13 @@ class Player(Entity):
             self._level_up()
 
     def _exp_to_next_level(self) -> int:
-        return self.level * LEVEL_UP_CONFIG['XP_MULTIPLIER']
+        # Calculate XP needed for next level
+        return self.level * 10
 
     def _level_up(self) -> None:
+        # Handle level up stats increase
         self.level += 1
-        self.max_hp += LEVEL_UP_CONFIG['HP_INCREASE']
+        self.max_hp += 2
         self.hp = self.max_hp
-        self.strength += LEVEL_UP_CONFIG['STRENGTH_INCREASE']
+        self.strength += 1
         logger.info(f"Level up! Now level {self.level}") 

@@ -6,7 +6,6 @@ import logging
 from logging.handlers import RotatingFileHandler
 import os
 from datetime import datetime
-from constants.game_constants import LOG_CONFIG
 
 def get_logger(name: str) -> logging.Logger:
     """
@@ -38,8 +37,8 @@ def get_logger(name: str) -> logging.Logger:
         # Setup rotating file handler
         file_handler = RotatingFileHandler(
             log_file,
-            maxBytes=LOG_CONFIG['MAX_FILE_SIZE'],
-            backupCount=LOG_CONFIG['BACKUP_COUNT']
+            maxBytes=1024 * 1024,  # 1MB per file
+            backupCount=2  # Keep 3 files (current + 2 backups)
         )
         file_handler.setLevel(logging.DEBUG)
         
@@ -52,7 +51,7 @@ def get_logger(name: str) -> logging.Logger:
     
     return logger
 
-def _cleanup_old_logs(log_dir: str, keep_count: int = LOG_CONFIG['BACKUP_COUNT'] + 1) -> None:
+def _cleanup_old_logs(log_dir: str, keep_count: int = 3) -> None:
     """
     Remove old log files, keeping only the most recent ones
     

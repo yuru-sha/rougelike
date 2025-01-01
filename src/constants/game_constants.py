@@ -62,24 +62,4 @@ GOLD_CONFIG = {
     'MAX_AMOUNT': 250,    # Maximum gold per pile
     'MIN_PILES': 2,       # Minimum piles per level
     'MAX_PILES': 4        # Maximum piles per level
-}
-
-# Level up bonuses
-LEVEL_UP_CONFIG = {
-    'HP_INCREASE': 2,
-    'STRENGTH_INCREASE': 1,
-    'XP_MULTIPLIER': 10
-}
-
-# Scoring system
-SCORE_CONFIG = {
-    'LEVEL_MULTIPLIER': 1000,
-    'DEPTH_MULTIPLIER': 500,
-    'AMULET_BONUS': 20000
-}
-
-# Logging configuration
-LOG_CONFIG = {
-    'MAX_FILE_SIZE': 1024 * 1024,  # 1MB
-    'BACKUP_COUNT': 2
 } 
