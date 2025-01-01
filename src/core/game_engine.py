@@ -90,6 +90,7 @@ class GameEngine:
         dx, dy = self.movement_vectors[direction]
         if self.game_state.player.move(dx, dy, self.game_state.current_map):
             self._check_pickup()
+            self._update_location_message()
 
     def _check_pickup(self) -> None:
         """Check for and handle item pickup at player's position"""
@@ -125,7 +126,10 @@ class GameEngine:
         for room in self.game_state.current_map.rooms:
             if (room.x <= x < room.x + room.width and 
                 room.y <= y < room.y + room.height):
+                self.renderer.add_message("You are in a room")
                 break
+        else:
+            self.renderer.add_message("You are in a corridor")
 
     def _show_game_over(self) -> None:
         """Display game over screen and handle high score entry"""

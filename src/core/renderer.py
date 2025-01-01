@@ -30,9 +30,8 @@ class Renderer:
         # 画面レイアウト
         self.layout = {
             'message_y': 0,
-            'map_start_y': 1,  # メッセージ行のみ（空白行なし）
-            'map_height': 22,  # マップの高さを22行に設定
-            'status_y': 23     # マップの下にステータス行を配置
+            'map_start_y': 2,  # メッセージ行 + 空白行
+            'status_y': self.terminal.height - 1
         }
 
     def render(self, game_state: GameState) -> None:
@@ -93,14 +92,13 @@ class Renderer:
 
     def _render_status(self, game_state: GameState) -> None:
         """ステータス行を描画"""
-        player = game_state.player
         status = (
             f"Level:{game_state.game_level} "
-            f"Gold:{player.gold} "
-            f"Hp:{player.hp}({player.max_hp}) "
-            f"Str:{player.strength} "
-            f"Ac:{getattr(player, 'armor_class', 0)} "
-            f"Exp:{player.level}/{player.exp}"
+            f"Gold:{game_state.player.gold} "
+            f"Hp:{game_state.player.hp}({game_state.player.max_hp}) "
+            f"Str:{game_state.player.strength}({game_state.player.strength}) "
+            f"Arm:{getattr(game_state.player, 'armor_class', 0)} "
+            f"Exp:{game_state.player.level}/{game_state.player.exp}"
         )
         with self.terminal.location(0, self.layout['status_y']):
             print(self.colors['status'] + status.ljust(self.terminal.width))
