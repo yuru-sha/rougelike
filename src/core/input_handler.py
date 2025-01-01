@@ -27,12 +27,6 @@ class InputHandler:
         if key.name == 'KEY_ESCAPE' or key == 'q':
             return 'quit'
         
-        # y/n confirmation
-        if key == 'y':
-            return 'y'
-        if key == 'n':
-            return 'n'
-        
         # Movement commands
         if key.name == 'KEY_UP' or key == 'k':
             return 'move_up'

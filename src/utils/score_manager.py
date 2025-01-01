@@ -5,7 +5,7 @@ Handles saving and loading high scores
 import json
 import os
 from datetime import datetime
-from typing import List, Dict, Any
+from typing import List, Dict
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -23,15 +23,7 @@ class ScoreManager:
         self.max_scores = max_scores
         self._ensure_scores_file()
 
-    def add_score(
-        self, 
-        name: str, 
-        score: int, 
-        gold: int, 
-        level: int, 
-        depth: int,
-        victory: bool = False
-    ) -> int:
+    def add_score(self, name: str, score: int, gold: int, level: int, depth: int) -> int:
         """
         Add new score and return ranking position
         
@@ -41,7 +33,6 @@ class ScoreManager:
             gold: Gold collected
             level: Player level
             depth: Maximum dungeon depth reached
-            victory: Whether player achieved victory
             
         Returns:
             int: Ranking position (1-based)
@@ -52,7 +43,6 @@ class ScoreManager:
             'gold': gold,
             'level': level,
             'depth': depth,
-            'victory': victory,
             'date': datetime.now().strftime('%Y-%m-%d %H:%M')
         }
         
@@ -69,7 +59,7 @@ class ScoreManager:
         
         return position + 1
 
-    def get_high_scores(self) -> List[Dict[str, Any]]:
+    def get_high_scores(self) -> List[Dict]:
         """
         Get list of high scores
         
@@ -83,7 +73,7 @@ class ScoreManager:
         if not os.path.exists(self.scores_file):
             self._save_scores([])
 
-    def _load_scores(self) -> List[Dict[str, Any]]:
+    def _load_scores(self) -> List[Dict]:
         # Load scores from file
         try:
             with open(self.scores_file, 'r') as f:
@@ -92,7 +82,7 @@ class ScoreManager:
             logger.error(f"Error loading scores from {self.scores_file}")
             return []
 
-    def _save_scores(self, scores: List[Dict[str, Any]]) -> None:
+    def _save_scores(self, scores: List[Dict]) -> None:
         # Save scores to file
         try:
             with open(self.scores_file, 'w') as f:
