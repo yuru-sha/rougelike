@@ -8,37 +8,29 @@ import os
 from datetime import datetime
 
 def get_logger(name: str) -> logging.Logger:
-    """
-    Configure and return a logger instance
-    
-    Args:
-        name: Logger name (usually __name__)
-        
-    Returns:
-        logging.Logger: Configured logger instance
-    """
+    """ロガーインスタンスを設定して返す"""
     logger = logging.getLogger(name)
     
     if not logger.handlers:
         logger.setLevel(logging.DEBUG)
         
-        # Create logs directory if not exists
+        # ログディレクトリの作成
         log_dir = "logs"
         if not os.path.exists(log_dir):
             os.makedirs(log_dir)
         
-        # Clean up old log files
+        # 古いログファイルを削除
         _cleanup_old_logs(log_dir)
             
-        # Include timestamp in filename
+        # ファイル名に日時を含める
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         log_file = f"{log_dir}/roguelike_{timestamp}.log"
         
-        # Setup rotating file handler
+        # ローテーション付きファイルハンドラー
         file_handler = RotatingFileHandler(
             log_file,
-            maxBytes=1024 * 1024,  # 1MB per file
-            backupCount=2  # Keep 3 files (current + 2 backups)
+            maxBytes=1024 * 1024,  # 1MB
+            backupCount=2  # 3件のログを保持（現在のファイル + 2つのバックアップ）
         )
         file_handler.setLevel(logging.DEBUG)
         
@@ -52,23 +44,17 @@ def get_logger(name: str) -> logging.Logger:
     return logger
 
 def _cleanup_old_logs(log_dir: str, keep_count: int = 3) -> None:
-    """
-    Remove old log files, keeping only the most recent ones
-    
-    Args:
-        log_dir: Directory containing log files
-        keep_count: Number of recent files to keep
-    """
+    """古いログファイルを削除"""
     log_files = []
     for file in os.listdir(log_dir):
         if file.startswith("roguelike_") and file.endswith(".log"):
             full_path = os.path.join(log_dir, file)
             log_files.append((full_path, os.path.getmtime(full_path)))
     
-    # Sort by modification time
+    # 更新日時でソート
     log_files.sort(key=lambda x: x[1], reverse=True)
     
-    # Remove old files
+    # 古いファイルを削除
     for file_path, _ in log_files[keep_count:]:
         try:
             os.remove(file_path)

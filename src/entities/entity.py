@@ -4,19 +4,9 @@ Base entity class for all game objects
 from typing import Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from core.map import GameMap  # Import for type hints only
+    from core.map import GameMap  # 型チェック時のみインポート
 
 class Entity:
-    """
-    Base class for all game entities
-    
-    Attributes:
-        x: X-coordinate position
-        y: Y-coordinate position
-        char: Display character
-        name: Entity name
-        blocks_movement: Whether entity blocks movement
-    """
     def __init__(self, x: int, y: int, char: str, name: str, blocks_movement: bool = True):
         self.x = x
         self.y = y
@@ -26,26 +16,10 @@ class Entity:
     
     @property
     def position(self) -> Tuple[int, int]:
-        """
-        Get current position
-        
-        Returns:
-            Tuple[int, int]: Current (x, y) coordinates
-        """
         return (self.x, self.y)
     
-    def move(self, dx: int, dy: int, game_map: 'GameMap') -> bool:
-        """
-        Attempt to move entity by given delta
-        
-        Args:
-            dx: X-axis movement delta
-            dy: Y-axis movement delta
-            game_map: Current game map
-            
-        Returns:
-            bool: True if movement successful, False otherwise
-        """
+    def move(self, dx: int, dy: int, game_map: 'GameMap') -> bool:  # 型ヒントを文字列で指定
+        """エンティティの移動を試みる"""
         new_x = self.x + dx
         new_y = self.y + dy
         
@@ -56,15 +30,7 @@ class Entity:
         return False
 
     def distance_to(self, other: 'Entity') -> float:
-        """
-        Calculate distance to another entity
-        
-        Args:
-            other: Target entity
-            
-        Returns:
-            float: Euclidean distance to target
-        """
+        """他のエンティティまでの距離を計算"""
         dx = other.x - self.x
         dy = other.y - self.y
         return (dx ** 2 + dy ** 2) ** 0.5 
