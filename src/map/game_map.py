@@ -128,31 +128,36 @@ class GameMap:
                     return Entity(
                         x, y, '!', (127, 0, 0), 'Healing Potion',
                         EntityType.ITEM, blocks=False,
-                        effect='heal', effect_amount=4
+                        effect='heal', effect_amount=4,
+                        stack_size=5
                     )
                 elif item_name == 'lightning_scroll':
                     return Entity(
                         x, y, '?', (0, 127, 127), 'Lightning Scroll',
                         EntityType.ITEM, blocks=False,
-                        effect='lightning', effect_amount=5
+                        effect='lightning', effect_amount=5,
+                        stack_size=10
                     )
                 elif item_name == 'fireball_scroll':
                     return Entity(
                         x, y, '?', (127, 127, 0), 'Fireball Scroll',
                         EntityType.ITEM, blocks=False,
-                        effect='fireball', effect_amount=3
+                        effect='fireball', effect_amount=3,
+                        stack_size=10
                     )
                 elif item_name == 'confusion_scroll':
                     return Entity(
                         x, y, '?', (127, 0, 127), 'Confusion Scroll',
                         EntityType.ITEM, blocks=False,
-                        effect='confusion', effect_amount=4
+                        effect='confusion', effect_amount=4,
+                        stack_size=10
                     )
                 elif item_name == 'teleport_scroll':
                     return Entity(
                         x, y, '?', (0, 255, 255), 'Teleport Scroll',
                         EntityType.ITEM, blocks=False,
-                        effect='teleport', effect_amount=0
+                        effect='teleport', effect_amount=0,
+                        stack_size=10
                     )
                 elif item_name == 'weapon':
                     weapon_name = random.choice(list(WEAPONS.keys()))
@@ -289,3 +294,71 @@ class GameMap:
                     EntityType.STAIRS_DOWN, blocks=False
                 )
                 entities.append(stairs) 
+
+    def _create_starting_equipment(self) -> List[Entity]:
+        equipment = []
+
+        # 初期武器（ダガー）
+        dagger_data = MELEE_WEAPONS['Dagger']
+        dagger = Entity(
+            0, 0,
+            dagger_data['char'],
+            dagger_data['color'],
+            'Dagger',
+            EntityType.WEAPON,
+            blocks=False,
+            damage_dice=(STARTING_WEAPON_POWER, STARTING_WEAPON_DICE),
+            hit_bonus=STARTING_WEAPON_BONUS,
+            two_handed=False
+        )
+        equipment.append(dagger)
+
+        # 初期遠距離武器（ショートボウ）
+        bow_data = RANGED_WEAPONS['Short Bow']
+        bow = Entity(
+            0, 0,
+            bow_data['char'],
+            bow_data['color'],
+            'Short Bow',
+            EntityType.RANGED,
+            blocks=False,
+            damage_dice=(STARTING_BOW_POWER, STARTING_BOW_DICE),
+            hit_bonus=1,
+            two_handed=True,
+            ranged=True,
+            ammo_type='arrow'
+        )
+        equipment.append(bow)
+
+        # 初期矢
+        arrow_data = AMMO['Arrow']
+        arrows = Entity(
+            0, 0,
+            arrow_data['char'],
+            arrow_data['color'],
+            'Arrow',
+            EntityType.AMMO,
+            blocks=False,
+            damage_dice=arrow_data['damage'],
+            ammo_type='arrow',
+            stack_size=arrow_data['stack_size'],
+            count=STARTING_ARROWS
+        )
+        equipment.append(arrows)
+
+        # 初期食料
+        food_data = FOODS['Ration']
+        food = Entity(
+            0, 0,
+            food_data['char'],
+            food_data['color'],
+            'Food Ration',
+            EntityType.FOOD,
+            blocks=False,
+            nutrition=food_data['nutrition'],
+            stack_size=5,
+            count=STARTING_FOOD
+        )
+        equipment.append(food)
+
+        return equipment 

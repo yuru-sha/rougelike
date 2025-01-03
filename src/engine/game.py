@@ -388,7 +388,7 @@ class Game:
 
     def _render_inventory(self, console: tcod.console.Console) -> None:
         # インベントリウィンドウの位置とサイズ
-        inventory_width = 40  # 幅を広げる
+        inventory_width = 40
         inventory_height = len(self.player.inventory) + 2
         inventory_x = SCREEN_WIDTH // 2 - inventory_width // 2
         inventory_y = SCREEN_HEIGHT // 2 - inventory_height // 2
@@ -434,7 +434,10 @@ class Game:
                 elif item.entity_type == EntityType.AMMO and equipped_ranged and item.ammo_type == equipped_ranged.ammo_type:
                     equipped_mark = " (quivered)"
 
-                text = f"{key}) {item.name}{equipped_mark}"
+                # スタック数を含むアイテム名を取得
+                item_name = item.display_name
+
+                text = f"{key}) {item_name}{equipped_mark}"
                 console.print(
                     inventory_x + 1,
                     inventory_y + i + 1,

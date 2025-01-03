@@ -67,7 +67,9 @@ class Entity:
         regeneration: bool = False,
         defense: int = 0,
         weight: int = 0,
-        gold: int = 0
+        gold: int = 0,
+        stack_size: Optional[int] = None,  # 最大スタックサイズ
+        count: Optional[int] = None  # 現在のスタック数
     ):
         self.x = x
         self.y = y
@@ -107,6 +109,62 @@ class Entity:
         self.weight = weight
         self.move_count = 0.0
         self.gold = gold
+        self.stack_size = stack_size  # 最大スタックサイズを追加
+        self.count = count or 1  # 現在のスタック数を追加
+
+    @property
+    def display_name(self) -> str:
+        """アイテム名を表示用にフォーマット"""
+        if self.stack_size and self.count > 1:
+            return f"{self.name} ({self.count})"
+        return self.name
+
+    def can_stack_with(self, other: 'Entity') -> bool:
+        """別のアイテムとスタック可能かチェック"""
+        if not self.stack_size or not other.stack_size:
+            return False
+        
+        return (
+            self.entity_type == other.entity_type and
+            self.name == other.name and
+            self.effect == other.effect and
+            self.effect_amount == other.effect_amount and
+            self.ammo_type == other.ammo_type and
+            self.damage_dice == other.damage_dice
+        )
+
+    def stack_with(self, other: 'Entity') -> bool:
+        """別のアイテムとスタックを試みる"""
+        if not self.can_stack_with(other):
+            return False
+
+        total_count = self.count + other.count
+        if self.stack_size and total_count <= self.stack_size:
+            self.count = total_count
+            return True
+        return False
+
+    def split_stack(self, amount: int) -> Optional['Entity']:
+        """スタックを分割する"""
+        if not self.stack_size or amount >= self.count or amount < 1:
+            return None
+
+        # 新しいエンティティを作成
+        new_entity = Entity(
+            self.x, self.y,
+            self.char, self.color,
+            self.name, self.entity_type,
+            blocks=self.blocks,
+            effect=self.effect,
+            effect_amount=self.effect_amount,
+            ammo_type=self.ammo_type,
+            damage_dice=self.damage_dice,
+            stack_size=self.stack_size,
+            count=amount
+        )
+
+        self.count -= amount
+        return new_entity
 
     def heal(self, amount: int) -> None:
         self.hp = min(self.hp + amount, self.max_hp)
@@ -227,7 +285,7 @@ class Entity:
         entities.remove(gold)
 
     def pick_up(self, entities: List["Entity"]) -> None:
-        for entity in entities:
+        for entity in list(entities):  # エンティティのリストのコピーを作成
             if entity.x == self.x and entity.y == self.y:
                 if entity.entity_type == EntityType.GOLD:
                     self._collect_gold(entity, entities)
@@ -235,8 +293,21 @@ class Entity:
                 elif entity.entity_type not in [EntityType.PLAYER, EntityType.MONSTER]:
                     if len(self.inventory) >= 26:  # インベントリ容量
                         return
-                    self.inventory.append(entity)
-                    entities.remove(entity)
+
+                    # スタック可能なアイテムを探す
+                    stacked = False
+                    if entity.stack_size:
+                        for inv_item in self.inventory:
+                            if inv_item.can_stack_with(entity):
+                                if inv_item.stack_with(entity):
+                                    entities.remove(entity)
+                                    stacked = True
+                                    break
+
+                    # スタックできなかった場合は新しいアイテムとして追加
+                    if not stacked:
+                        self.inventory.append(entity)
+                        entities.remove(entity)
                     break
 
     def take_turn(self, target: "Entity", game_map: "GameMap", entities: List["Entity"]) -> None:
