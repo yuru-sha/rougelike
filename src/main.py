@@ -195,7 +195,7 @@ class Entity:
             self.inventory.remove(item)
 
     def move(self, dx: int, dy: int, game_map: "GameMap", entities: List["Entity"]) -> None:
-        """移動先が通行可能な場合のみ移動"""
+        """移動先が通行可能な場合のみ移動。モンスターがいれば攻撃。"""
         new_x = self.x + dx
         new_y = self.y + dy
         
@@ -208,6 +208,14 @@ class Entity:
                     entities.remove(entity)
                     print(f"{entity.gold_amount}ゴールドを拾いました。所持金: {self.gold_amount}")
                     break
+                elif entity.entity_type == EntityType.MONSTER and self.entity_type == EntityType.PLAYER:
+                    # プレイヤーがモンスターに移動しようとした場合は攻撃
+                    self.attack(entity, entities)
+                    return
+                elif entity.entity_type == EntityType.PLAYER and self.entity_type == EntityType.MONSTER:
+                    # モンスターがプレイヤーに移動しようとした場合は攻撃
+                    self.attack(entity, entities)
+                    return
         
         if (game_map.tiles[new_x][new_y].walkable and
             not any(entity.blocks and entity.x == new_x and entity.y == new_y
@@ -515,10 +523,10 @@ class GameMap:
 
 def handle_input(event: tcod.event.Event, player: Entity, game_map: GameMap, entities: List[Entity]) -> Optional[bool]:
     """キー入力を処理する。Trueを返すとゲームを終了する。"""
-    if event.type == "QUIT":
+    if isinstance(event, tcod.event.Quit):
         return True
         
-    if event.type == "KEYDOWN":
+    if isinstance(event, tcod.event.KeyDown):
         action_taken = False  # プレイヤーがアクションを実行したかどうか
         
         # 移動キーの設定
@@ -575,11 +583,11 @@ def handle_input(event: tcod.event.Event, player: Entity, game_map: GameMap, ent
                     print(f"{chr(97 + i)}) {item.name}")
                 print("\nESCでキャンセル")
                 while True:
-                    event = tcod.event.wait()
-                    if event.type == "KEYDOWN":
-                        if event.sym == tcod.event.KeySym.ESCAPE:
+                    next_event = tcod.event.wait()
+                    if isinstance(next_event, tcod.event.KeyDown):
+                        if next_event.sym == tcod.event.KeySym.ESCAPE:
                             break
-                        index = ord(event.sym.name) - ord('a')
+                        index = ord(next_event.sym.name) - ord('a')
                         if 0 <= index < len(player.inventory):
                             player.use_item(player.inventory[index], entities, game_map)
                             action_taken = True
@@ -593,11 +601,11 @@ def handle_input(event: tcod.event.Event, player: Entity, game_map: GameMap, ent
                     print(f"{chr(97 + i)}) {item.name}")
                 print("\nESCでキャンセル")
                 while True:
-                    event = tcod.event.wait()
-                    if event.type == "KEYDOWN":
-                        if event.sym == tcod.event.KeySym.ESCAPE:
+                    next_event = tcod.event.wait()
+                    if isinstance(next_event, tcod.event.KeyDown):
+                        if next_event.sym == tcod.event.KeySym.ESCAPE:
                             break
-                        index = ord(event.sym.name) - ord('a')
+                        index = ord(next_event.sym.name) - ord('a')
                         if 0 <= index < len(player.inventory):
                             player.drop_item(player.inventory[index], entities)
                             action_taken = True
@@ -646,7 +654,8 @@ def main():
     ) as context:
         root_console = tcod.console.Console(SCREEN_WIDTH, SCREEN_HEIGHT, order="F")
         
-        while True:
+        running = True
+        while running:
             root_console.clear()
             
             # マップの描画
@@ -689,7 +698,8 @@ def main():
             # イベント処理
             for event in tcod.event.wait():
                 if handle_input(event, player, game_map, entities):
-                    raise SystemExit()
+                    running = False
+                    break
 
 if __name__ == "__main__":
     main()
