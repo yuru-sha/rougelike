@@ -12,6 +12,7 @@ MAP_HEIGHT = 45
 ROOM_MAX_SIZE = 10
 ROOM_MIN_SIZE = 6
 MAX_ROOMS = 30
+MAX_DUNGEON_LEVEL = 26  # 最大階層数
 
 # エンティティの生成設定
 MAX_MONSTERS_PER_ROOM = 3
@@ -19,7 +20,7 @@ MAX_ITEMS_PER_ROOM = 2
 MAX_GOLD_PER_ROOM = 2
 GOLD_MIN_AMOUNT = 10
 GOLD_MAX_AMOUNT = 50
-INVENTORY_CAPACITY = 26  # a-zの26文字分
+INVENTORY_CAPACITY = 26
 
 TITLE = "Roguelike Game"
 
@@ -28,6 +29,8 @@ class EntityType(Enum):
     MONSTER = auto()
     ITEM = auto()
     GOLD = auto()
+    STAIRS_DOWN = auto()  # 下り階段
+    STAIRS_UP = auto()    # 上り階段
 
 class ItemEffect(Enum):
     HEAL = auto()
@@ -58,7 +61,8 @@ class Entity:
         sight_radius: int = 8,  # 視界範囲
         xp: int = 0,  # 経験値
         xp_given: int = 0,  # 倒した時に得られる経験値
-        level: int = 1  # レベル
+        level: int = 1,  # レベル
+        dungeon_level: int = 1  # 現在の階層
     ):
         self.x = x
         self.y = y
@@ -79,6 +83,7 @@ class Entity:
         self.xp = xp
         self.xp_given = xp_given
         self.level = level
+        self.dungeon_level = dungeon_level
 
     def heal(self, amount: int) -> None:
         """HPを回復する"""
@@ -345,9 +350,10 @@ class Rectangle:
         )
 
 class GameMap:
-    def __init__(self, width: int, height: int):
+    def __init__(self, width: int, height: int, dungeon_level: int):
         self.width = width
         self.height = height
+        self.dungeon_level = dungeon_level
         self.tiles = self.initialize_tiles()
     
     def initialize_tiles(self) -> List[List[Tile]]:
@@ -521,6 +527,24 @@ class GameMap:
                 
                 rooms.append(new_room)
 
+        # 最後の部屋に下り階段を配置（最下層以外）
+        if self.dungeon_level < MAX_DUNGEON_LEVEL:
+            stairs_x, stairs_y = rooms[-1].center
+            stairs_down = Entity(
+                stairs_x, stairs_y, '>', (255, 255, 255), 'Stairs down',
+                EntityType.STAIRS_DOWN, blocks=False
+            )
+            entities.append(stairs_down)
+
+        # 最初の部屋に上り階段を配置（1階以外）
+        if self.dungeon_level > 1:
+            stairs_x, stairs_y = rooms[0].center
+            stairs_up = Entity(
+                stairs_x, stairs_y, '<', (255, 255, 255), 'Stairs up',
+                EntityType.STAIRS_UP, blocks=False
+            )
+            entities.append(stairs_up)
+
 def handle_input(event: tcod.event.Event, player: Entity, game_map: GameMap, entities: List[Entity]) -> Optional[bool]:
     """キー入力を処理する。Trueを返すとゲームを終了する。"""
     if isinstance(event, tcod.event.Quit):
@@ -612,6 +636,22 @@ def handle_input(event: tcod.event.Event, player: Entity, game_map: GameMap, ent
                             break
             else:
                 print("\nインベントリは空です。")
+        elif event.sym == tcod.event.KeySym.PERIOD and (
+            event.mod & tcod.event.KMOD_SHIFT
+        ):  # > (下り階段)
+            for entity in entities:
+                if (entity.x == player.x and entity.y == player.y and
+                    entity.entity_type == EntityType.STAIRS_DOWN):
+                    return "next_level"
+        
+        elif event.sym == tcod.event.KeySym.COMMA and (
+            event.mod & tcod.event.KMOD_SHIFT
+        ):  # < (上り階段)
+            for entity in entities:
+                if (entity.x == player.x and entity.y == player.y and
+                    entity.entity_type == EntityType.STAIRS_UP):
+                    return "previous_level"
+        
         elif event.sym == tcod.event.KeySym.ESCAPE:
             return True
 
@@ -637,11 +677,11 @@ def main():
     # エンティティリストの作成（プレイヤーを含む）
     player = Entity(0, 0, '@', (255, 255, 255), 'Player', EntityType.PLAYER,
                    gold_amount=0, hp=30, max_hp=30, power=5,
-                   level=1, xp=0)
+                   level=1, xp=0, dungeon_level=1)
     entities = [player]
 
     # マップを生成
-    game_map = GameMap(MAP_WIDTH, MAP_HEIGHT)
+    game_map = GameMap(MAP_WIDTH, MAP_HEIGHT, dungeon_level=1)
     game_map.make_map(player, entities)
 
     # コンソールの初期化
@@ -666,8 +706,8 @@ def main():
                     else:
                         root_console.print(x=x, y=y, string="#")
             
-            # エンティティの描画（アイテム → モンスター → プレイヤーの順）
-            for entity in [e for e in entities if e.entity_type in {EntityType.ITEM, EntityType.GOLD}]:
+            # エンティティの描画（アイテム/階段 → モンスター → プレイヤーの順）
+            for entity in [e for e in entities if e.entity_type in {EntityType.ITEM, EntityType.GOLD, EntityType.STAIRS_DOWN, EntityType.STAIRS_UP}]:
                 root_console.print(
                     x=entity.x,
                     y=entity.y,
@@ -691,13 +731,31 @@ def main():
                     string=entity.char,
                     fg=entity.color
                 )
+
+            # 階層情報を表示
+            root_console.print(x=0, y=47, string=f"Level: {game_map.dungeon_level}")
             
             # 画面の更新
             context.present(root_console)
             
             # イベント処理
             for event in tcod.event.wait():
-                if handle_input(event, player, game_map, entities):
+                result = handle_input(event, player, game_map, entities)
+                if result == "next_level" and game_map.dungeon_level < MAX_DUNGEON_LEVEL:
+                    # 次の階層へ
+                    game_map = GameMap(MAP_WIDTH, MAP_HEIGHT, game_map.dungeon_level + 1)
+                    player.dungeon_level += 1
+                    entities = [player]
+                    game_map.make_map(player, entities)
+                    print(f"You descend to level {game_map.dungeon_level}")
+                elif result == "previous_level" and game_map.dungeon_level > 1:
+                    # 前の階層へ
+                    game_map = GameMap(MAP_WIDTH, MAP_HEIGHT, game_map.dungeon_level - 1)
+                    player.dungeon_level -= 1
+                    entities = [player]
+                    game_map.make_map(player, entities)
+                    print(f"You ascend to level {game_map.dungeon_level}")
+                elif result is True:
                     running = False
                     break
 
