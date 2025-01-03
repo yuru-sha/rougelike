@@ -33,6 +33,8 @@ class ItemEffect(Enum):
     HEAL = auto()
     LIGHTNING = auto()
     FIREBALL = auto()
+    CONFUSION = auto()
+    TELEPORT = auto()
 
 class Entity:
     """プレイヤー、モンスター、アイテムなどの基本クラス"""
@@ -50,7 +52,13 @@ class Entity:
         hp: int = 30,
         max_hp: int = 30,
         effect: Optional[ItemEffect] = None,
-        effect_amount: int = 0
+        effect_amount: int = 0,
+        confused_turns: int = 0,
+        power: int = 0,  # 攻撃力
+        sight_radius: int = 8,  # 視界範囲
+        xp: int = 0,  # 経験値
+        xp_given: int = 0,  # 倒した時に得られる経験値
+        level: int = 1  # レベル
     ):
         self.x = x
         self.y = y
@@ -65,6 +73,12 @@ class Entity:
         self.max_hp = max_hp
         self.effect = effect
         self.effect_amount = effect_amount
+        self.confused_turns = confused_turns
+        self.power = power
+        self.sight_radius = sight_radius
+        self.xp = xp
+        self.xp_given = xp_given
+        self.level = level
 
     def heal(self, amount: int) -> None:
         """HPを回復する"""
@@ -74,10 +88,11 @@ class Entity:
     def take_damage(self, amount: int) -> None:
         """ダメージを受ける"""
         self.hp = max(0, self.hp - amount)
-        if self.hp == 0 and self.entity_type == EntityType.MONSTER:
-            print(f"{self.name}を倒しました！")
-        else:
-            print(f"{amount}のダメージを受けました。現在のHP: {self.hp}/{self.max_hp}")
+        if self.hp == 0:
+            if self.entity_type == EntityType.MONSTER:
+                print(f"{self.name}を倒しました！")
+            else:
+                print(f"{amount}のダメージを受けました。現在のHP: {self.hp}/{self.max_hp}")
 
     def drop_item(self, item: "Entity", entities: List["Entity"]) -> None:
         """アイテムを足元にドロップする"""
@@ -93,10 +108,16 @@ class Entity:
         if item not in self.inventory:
             return
 
+        used = False
+
         if item.effect == ItemEffect.HEAL:
-            self.heal(item.effect_amount)
-            self.inventory.remove(item)
-            print(f"{item.name}を使用しました。")
+            if self.hp < self.max_hp:
+                self.heal(item.effect_amount)
+                used = True
+            else:
+                print("HPが満タンです！")
+                return
+
         elif item.effect == ItemEffect.LIGHTNING:
             # 最も近いモンスターにダメージ
             closest_monster = None
@@ -108,13 +129,13 @@ class Entity:
                         closest_monster = entity
                         closest_distance = distance
             
-            if closest_monster:
+            if closest_monster and closest_distance <= 5:  # 射程範囲を5マスに制限
                 closest_monster.take_damage(item.effect_amount)
-                self.inventory.remove(item)
-                print(f"{item.name}を使用し、{closest_monster.name}に{item.effect_amount}のダメージを与えました！")
+                used = True
             else:
-                print("近くにモンスターがいません。")
+                print("射程範囲内にモンスターがいません。")
                 return
+
         elif item.effect == ItemEffect.FIREBALL:
             # 自分の周囲のモンスターにダメージ
             radius = 3
@@ -128,11 +149,50 @@ class Entity:
             if affected_monsters:
                 for monster in affected_monsters:
                     monster.take_damage(item.effect_amount)
-                self.inventory.remove(item)
-                print(f"{item.name}を使用し、{len(affected_monsters)}体のモンスターにダメージを与えました！")
+                used = True
+                print(f"{item.name}を使用し、{len(affected_monsters)}体のモンスターに{item.effect_amount}のダメージを与えました！")
             else:
                 print("範囲内にモンスターがいません。")
                 return
+
+        elif item.effect == ItemEffect.CONFUSION:
+            # 最も近いモンスターを混乱させる
+            closest_monster = None
+            closest_distance = float('inf')
+            for entity in entities:
+                if entity.entity_type == EntityType.MONSTER:
+                    distance = abs(self.x - entity.x) + abs(self.y - entity.y)
+                    if distance < closest_distance:
+                        closest_monster = entity
+                        closest_distance = distance
+            
+            if closest_monster and closest_distance <= 3:  # 射程範囲を3マスに制限
+                closest_monster.confused_turns = item.effect_amount
+                used = True
+                print(f"{closest_monster.name}を{item.effect_amount}ターンの間、混乱させました！")
+            else:
+                print("射程範囲内にモンスターがいません。")
+                return
+
+        elif item.effect == ItemEffect.TELEPORT:
+            # ランダムな場所にテレポート
+            for _ in range(100):  # 最大100回試行
+                new_x = random.randint(1, game_map.width - 2)
+                new_y = random.randint(1, game_map.height - 2)
+                if (game_map.tiles[new_x][new_y].walkable and
+                    not any(entity.blocks and entity.x == new_x and entity.y == new_y
+                           for entity in entities)):
+                    self.x = new_x
+                    self.y = new_y
+                    used = True
+                    print(f"{item.name}を使用し、ランダムな場所にテレポートしました！")
+                    break
+            else:
+                print("テレポートに失敗しました。")
+                return
+
+        if used:
+            self.inventory.remove(item)
 
     def move(self, dx: int, dy: int, game_map: "GameMap", entities: List["Entity"]) -> None:
         """移動先が通行可能な場合のみ移動"""
@@ -169,6 +229,83 @@ class Entity:
                 break
         else:
             print("ここにはアイテムがありません。")
+
+    def distance_to(self, other: "Entity") -> float:
+        """他のエンティティまでの距離を計算"""
+        dx = other.x - self.x
+        dy = other.y - self.y
+        return (dx ** 2 + dy ** 2) ** 0.5
+
+    def move_towards(self, target_x: int, target_y: int, game_map: "GameMap", entities: List["Entity"]) -> None:
+        """目標地点に向かって移動"""
+        dx = target_x - self.x
+        dy = target_y - self.y
+        distance = (dx ** 2 + dy ** 2) ** 0.5
+
+        dx = int(round(dx / distance)) if distance > 0 else 0
+        dy = int(round(dy / distance)) if distance > 0 else 0
+
+        self.move(dx, dy, game_map, entities)
+
+    def move_randomly(self, game_map: "GameMap", entities: List["Entity"]) -> None:
+        """ランダムな方向に移動"""
+        dx = random.randint(-1, 1)
+        dy = random.randint(-1, 1)
+        self.move(dx, dy, game_map, entities)
+
+    def attack(self, target: "Entity", entities: List["Entity"]) -> None:
+        """他のエンティティを攻撃"""
+        damage = self.power
+        target.take_damage(damage)
+        print(f"{self.name}が{target.name}に{damage}のダメージを与えました！")
+        
+        if target.hp <= 0 and target.entity_type == EntityType.MONSTER:
+            entities.remove(target)
+            if self.entity_type == EntityType.PLAYER:
+                self.add_xp(target.xp_given)  # 経験値を獲得
+
+    def take_turn(self, target: "Entity", game_map: "GameMap", entities: List["Entity"]) -> None:
+        """モンスターのターン処理"""
+        if self.confused_turns > 0:
+            # 混乱状態の場合、ランダムに移動
+            self.move_randomly(game_map, entities)
+            self.confused_turns -= 1
+            if self.confused_turns == 0:
+                print(f"{self.name}の混乱が解けました。")
+            return
+
+        distance = self.distance_to(target)
+        
+        if distance < self.sight_radius:
+            if distance <= 1:
+                # 隣接している場合は攻撃
+                self.attack(target, entities)
+            else:
+                # プレイヤーが視界内なら追跡
+                self.move_towards(target.x, target.y, game_map, entities)
+
+    def level_up(self) -> None:
+        """レベルアップ処理"""
+        self.level += 1
+        self.max_hp += 5
+        self.hp = self.max_hp  # レベルアップ時にHP全回復
+        self.power += 2
+        print(f"レベルアップ！ Level {self.level}")
+        print(f"最大HP +5 (現在: {self.max_hp})")
+        print(f"攻撃力 +2 (現在: {self.power})")
+
+    def add_xp(self, amount: int) -> None:
+        """経験値を追加し、必要に応じてレベルアップ"""
+        self.xp += amount
+        print(f"{amount}の経験値を獲得！ (現在: {self.xp})")
+        
+        # レベルアップに必要な経験値を計算
+        xp_to_next_level = self.level * 10
+        
+        while self.xp >= xp_to_next_level:
+            self.xp -= xp_to_next_level
+            self.level_up()
+            xp_to_next_level = self.level * 10
 
 class Tile:
     """マップタイル。通行可能かどうかを管理する。"""
@@ -237,7 +374,6 @@ class GameMap:
 
     def place_entities(self, room: Rectangle, entities: List[Entity]) -> None:
         """部屋にモンスター、アイテム、ゴールドを配置"""
-        # モンスターを配置
         number_of_monsters = random.randint(0, MAX_MONSTERS_PER_ROOM)
         number_of_items = random.randint(0, MAX_ITEMS_PER_ROOM)
         number_of_gold = random.randint(0, MAX_GOLD_PER_ROOM)
@@ -247,9 +383,11 @@ class GameMap:
             'troll': 20
         }
         item_chances: Dict[str, int] = {
-            'healing_potion': 50,
-            'lightning_scroll': 30,
-            'fireball_scroll': 20
+            'healing_potion': 35,
+            'lightning_scroll': 20,
+            'fireball_scroll': 15,
+            'confusion_scroll': 15,
+            'teleport_scroll': 15
         }
 
         # モンスターの配置
@@ -261,12 +399,14 @@ class GameMap:
                 if random.randint(1, 100) <= monster_chances['orc']:
                     monster = Entity(
                         x, y, 'o', (63, 127, 63), 'Orc',
-                        EntityType.MONSTER, hp=10, max_hp=10
+                        EntityType.MONSTER, hp=10, max_hp=10,
+                        power=3, sight_radius=8, xp_given=5
                     )
                 else:
                     monster = Entity(
                         x, y, 'T', (0, 127, 0), 'Troll',
-                        EntityType.MONSTER, hp=16, max_hp=16
+                        EntityType.MONSTER, hp=16, max_hp=16,
+                        power=4, sight_radius=8, xp_given=10
                     )
                 entities.append(monster)
 
@@ -277,25 +417,43 @@ class GameMap:
 
             if not any(entity.x == x and entity.y == y for entity in entities):
                 roll = random.randint(1, 100)
-                if roll <= item_chances['healing_potion']:
-                    item = Entity(
-                        x, y, '!', (127, 0, 0), 'Healing Potion',
-                        EntityType.ITEM, blocks=False,
-                        effect=ItemEffect.HEAL, effect_amount=4
-                    )
-                elif roll <= item_chances['healing_potion'] + item_chances['lightning_scroll']:
-                    item = Entity(
-                        x, y, '?', (0, 127, 127), 'Lightning Scroll',
-                        EntityType.ITEM, blocks=False,
-                        effect=ItemEffect.LIGHTNING, effect_amount=5
-                    )
-                else:
-                    item = Entity(
-                        x, y, '?', (127, 127, 0), 'Fireball Scroll',
-                        EntityType.ITEM, blocks=False,
-                        effect=ItemEffect.FIREBALL, effect_amount=3
-                    )
-                entities.append(item)
+                total = 0
+
+                for item_name, chance in item_chances.items():
+                    total += chance
+                    if roll <= total:
+                        if item_name == 'healing_potion':
+                            item = Entity(
+                                x, y, '!', (127, 0, 0), 'Healing Potion',
+                                EntityType.ITEM, blocks=False,
+                                effect=ItemEffect.HEAL, effect_amount=4
+                            )
+                        elif item_name == 'lightning_scroll':
+                            item = Entity(
+                                x, y, '?', (0, 127, 127), 'Lightning Scroll',
+                                EntityType.ITEM, blocks=False,
+                                effect=ItemEffect.LIGHTNING, effect_amount=5
+                            )
+                        elif item_name == 'fireball_scroll':
+                            item = Entity(
+                                x, y, '?', (127, 127, 0), 'Fireball Scroll',
+                                EntityType.ITEM, blocks=False,
+                                effect=ItemEffect.FIREBALL, effect_amount=3
+                            )
+                        elif item_name == 'confusion_scroll':
+                            item = Entity(
+                                x, y, '?', (127, 0, 127), 'Confusion Scroll',
+                                EntityType.ITEM, blocks=False,
+                                effect=ItemEffect.CONFUSION, effect_amount=4
+                            )
+                        else:  # teleport_scroll
+                            item = Entity(
+                                x, y, '?', (0, 255, 255), 'Teleport Scroll',
+                                EntityType.ITEM, blocks=False,
+                                effect=ItemEffect.TELEPORT, effect_amount=0
+                            )
+                        entities.append(item)
+                        break
 
         # ゴールドの配置
         for _ in range(number_of_gold):
@@ -361,6 +519,8 @@ def handle_input(event: tcod.event.Event, player: Entity, game_map: GameMap, ent
         return True
         
     if event.type == "KEYDOWN":
+        action_taken = False  # プレイヤーがアクションを実行したかどうか
+        
         # 移動キーの設定
         if event.sym in {
             # 矢印キー
@@ -397,8 +557,10 @@ def handle_input(event: tcod.event.Event, player: Entity, game_map: GameMap, ent
                 tcod.event.KeySym.n: (1, 1),   # 右下
             }[event.sym]
             player.move(dx, dy, game_map, entities)
+            action_taken = True
         elif event.sym == tcod.event.KeySym.g:  # アイテムを拾う
             player.get_item(entities)
+            action_taken = True
         elif event.sym == tcod.event.KeySym.i:  # インベントリを表示
             if player.inventory:
                 print("\nインベントリ:")
@@ -420,6 +582,7 @@ def handle_input(event: tcod.event.Event, player: Entity, game_map: GameMap, ent
                         index = ord(event.sym.name) - ord('a')
                         if 0 <= index < len(player.inventory):
                             player.use_item(player.inventory[index], entities, game_map)
+                            action_taken = True
                             break
             else:
                 print("\nインベントリは空です。")
@@ -437,11 +600,23 @@ def handle_input(event: tcod.event.Event, player: Entity, game_map: GameMap, ent
                         index = ord(event.sym.name) - ord('a')
                         if 0 <= index < len(player.inventory):
                             player.drop_item(player.inventory[index], entities)
+                            action_taken = True
                             break
             else:
                 print("\nインベントリは空です。")
         elif event.sym == tcod.event.KeySym.ESCAPE:
             return True
+
+        # プレイヤーがアクションを実行した場合、モンスターのターンを処理
+        if action_taken:
+            for entity in entities:
+                if entity.entity_type == EntityType.MONSTER and entity.hp > 0:
+                    entity.take_turn(player, game_map, entities)
+            
+            # プレイヤーの死亡判定
+            if player.hp <= 0:
+                print("あなたは死亡しました...")
+                return True
     
     return None
 
@@ -452,7 +627,9 @@ def main():
     )
 
     # エンティティリストの作成（プレイヤーを含む）
-    player = Entity(0, 0, '@', (255, 255, 255), 'Player', EntityType.PLAYER, gold_amount=0)
+    player = Entity(0, 0, '@', (255, 255, 255), 'Player', EntityType.PLAYER,
+                   gold_amount=0, hp=30, max_hp=30, power=5,
+                   level=1, xp=0)
     entities = [player]
 
     # マップを生成
