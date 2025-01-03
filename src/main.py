@@ -118,16 +118,16 @@ class Entity:
     def heal(self, amount: int) -> None:
         """HPを回復する"""
         self.hp = min(self.hp + amount, self.max_hp)
-        print(f"The healing potion heals {amount} hit points.")
+        print("You begin to feel better.")
 
     def take_damage(self, amount: int) -> None:
         """ダメージを受ける"""
         self.hp = max(0, self.hp - amount)
-        if self.hp == 0:
+        if self.hp <= 0:
             if self.entity_type == EntityType.MONSTER:
-                print(f"The {self.name} dies.")
+                print(f"The {self.name} dies in a fit of agony.")
             else:
-                print(f"The {self.name} hits you. ({amount} damage)")
+                print(f"The {self.name} hits you.")
 
     def drop_item(self, item: "Entity", entities: List["Entity"]) -> None:
         """アイテムを足元にドロップする"""
@@ -150,7 +150,7 @@ class Entity:
                 self.heal(item.effect_amount)
                 used = True
             else:
-                print("You are already at full health.")
+                print("Nothing happens.")
                 return
 
         elif item.effect == ItemEffect.LIGHTNING:
@@ -165,10 +165,10 @@ class Entity:
             
             if closest_monster and closest_distance <= 5:
                 closest_monster.take_damage(item.effect_amount)
-                print(f"Lightning strikes the {closest_monster.name}!")
+                print(f"Lightning strikes the {closest_monster.name} with a mighty crack!")
                 used = True
             else:
-                print("The scroll fizzles out.")
+                print("The scroll disintegrates.")
                 return
 
         elif item.effect == ItemEffect.FIREBALL:
@@ -183,10 +183,10 @@ class Entity:
             if affected_monsters:
                 for monster in affected_monsters:
                     monster.take_damage(item.effect_amount)
-                print("The scroll explodes in a ball of fire!")
+                print("The scroll erupts in a tower of flame!")
                 used = True
             else:
-                print("The scroll fizzles out.")
+                print("The scroll turns to dust.")
                 return
 
         elif item.effect == ItemEffect.CONFUSION:
@@ -204,24 +204,30 @@ class Entity:
                 print(f"The {closest_monster.name} appears confused!")
                 used = True
             else:
-                print("The scroll fizzles out.")
+                print("The scroll vanishes.")
                 return
 
         elif item.effect == ItemEffect.TELEPORT:
-            for _ in range(100):
-                new_x = random.randint(1, game_map.width - 2)
-                new_y = random.randint(1, game_map.height - 2)
-                if (game_map.tiles[new_x][new_y].walkable and
-                    not any(entity.blocks and entity.x == new_x and entity.y == new_y
-                           for entity in entities)):
-                    self.x = new_x
-                    self.y = new_y
-                    print("You teleport...")
-                    used = True
-                    break
+            # ランダムな部屋の中心に移動
+            rooms = []
+            for x in range(1, game_map.width - 1):
+                for y in range(1, game_map.height - 1):
+                    if game_map.tiles[x][y].walkable:
+                        rooms.append((x, y))
+            
+            if rooms:
+                new_x, new_y = random.choice(rooms)
+                self.x = new_x
+                self.y = new_y
+                print("You feel yourself moving...")
+                used = True
             else:
-                print("The scroll fizzles out.")
+                print("Nothing happens.")
                 return
+
+        elif item.effect == ItemEffect.IDENTIFY:
+            print("This is a scroll of identify.")
+            used = True
 
         if used:
             self.inventory.remove(item)
@@ -335,8 +341,8 @@ class Entity:
         self.max_hp += 5
         self.hp = self.max_hp
         self.power += 2
-        print(f"Welcome to level {self.level}!")
-        print("You feel stronger!")
+        print(f"You are now level {self.level}!")
+        print("You feel stronger now!")
 
     def add_xp(self, amount: int) -> None:
         """経験値を追加し、必要に応じてレベルアップ"""
@@ -349,6 +355,28 @@ class Entity:
             self.xp -= xp_to_next_level
             self.level_up()
             xp_to_next_level = self.level * 10
+
+    def pick_up(self, entities: List["Entity"]) -> None:
+        """足元のアイテムを拾う"""
+        for entity in entities:
+            if entity.x == self.x and entity.y == self.y:
+                if entity.entity_type == EntityType.GOLD:
+                    self.gold_amount += entity.gold_amount
+                    entities.remove(entity)
+                    print(f"You found {entity.gold_amount} pieces of gold.")
+                    break
+                if entity.entity_type == EntityType.ITEM or entity.entity_type == EntityType.AMULET:
+                    if len(self.inventory) < INVENTORY_CAPACITY:
+                        self.inventory.append(entity)
+                        entities.remove(entity)
+                        print(f"You now have {entity.name}.")
+                        if entity.entity_type == EntityType.AMULET:
+                            print("You feel a strange power in your hands!")
+                    else:
+                        print("You can't carry anything else.")
+                    break
+        else:
+            print("There is nothing here to pick up.")
 
 class Tile:
     """マップタイル。通行可能かどうかを管理する。"""
@@ -569,7 +597,7 @@ class GameMap:
                 )
                 entities.append(amulet)
                 AMULET_GENERATED = True
-                print("You feel a powerful magical artifact nearby...")
+                print("You feel something special nearby...")
 
         # 最下層以外は下り階段を配置
         if self.dungeon_level < MAX_DUNGEON_LEVEL:
@@ -588,6 +616,10 @@ class GameMap:
                 EntityType.STAIRS_UP, blocks=False
             )
             entities.append(stairs_up)
+
+        if any(item.entity_type == EntityType.AMULET for item in player.inventory):
+            print("The Amulet of Yendor glows with ancient power...")
+        print(f"Welcome to level {self.dungeon_level} of the Dungeons of Doom!")
 
 def handle_input(event: tcod.event.Event, player: Entity, game_map: GameMap, entities: List[Entity]) -> Optional[bool]:
     """キー入力を処理する。Trueを返すとゲームを終了する。"""
@@ -849,8 +881,8 @@ def main():
                     entities = [player]
                     game_map.make_map(player, entities)
                     if any(item.entity_type == EntityType.AMULET for item in player.inventory):
-                        print("The Amulet of Yendor pulses with mysterious energy...")
-                    print(f"You descend to level {game_map.dungeon_level}")
+                        print("The Amulet of Yendor glows with ancient power...")
+                    print(f"Welcome to level {game_map.dungeon_level} of the Dungeons of Doom!")
                 elif result == "previous_level" and game_map.dungeon_level > 1:
                     # 前の階層へ
                     game_map = GameMap(MAP_WIDTH, MAP_HEIGHT, game_map.dungeon_level - 1)
@@ -858,8 +890,8 @@ def main():
                     entities = [player]
                     game_map.make_map(player, entities)
                     if any(item.entity_type == EntityType.AMULET for item in player.inventory):
-                        print("The Amulet of Yendor pulses with mysterious energy...")
-                    print(f"You ascend to level {game_map.dungeon_level}")
+                        print("The Amulet of Yendor glows with ancient power...")
+                    print(f"Welcome to level {game_map.dungeon_level} of the Dungeons of Doom!")
                 elif result is True:
                     running = False
                     break
