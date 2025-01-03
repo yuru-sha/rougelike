@@ -70,6 +70,93 @@ MESSAGES = {
 TITLE = "Roguelike Game"
 AMULET_GENERATED = False
 
+# Monster Settings
+MONSTERS = {
+    'Bat': {
+        'char': 'B',
+        'color': (139, 69, 19),  # 茶色
+        'hp': (1, 8),  # 1d8
+        'damage': (1, 2),  # 1d2
+        'xp': 1,
+        'levels': (1, 8),  # 出現階層
+        'speed': 2.0,  # 移動速度（通常の2倍）
+        'sight_radius': 6
+    },
+    'Snake': {
+        'char': 'S',
+        'color': (0, 255, 0),  # 緑
+        'hp': (2, 6),  # 2d6
+        'damage': (1, 3),  # 1d3
+        'xp': 2,
+        'levels': (2, 9),
+        'speed': 1.0,
+        'sight_radius': 5
+    },
+    'Hobgoblin': {
+        'char': 'H',
+        'color': (139, 69, 19),
+        'hp': (1, 8),
+        'damage': (1, 8),
+        'xp': 2,
+        'levels': (1, 10),
+        'speed': 1.0,
+        'sight_radius': 7
+    },
+    'Kestrel': {
+        'char': 'K',
+        'color': (165, 42, 42),  # 茶色
+        'hp': (1, 6),
+        'damage': (1, 4),
+        'xp': 1,
+        'levels': (1, 7),
+        'speed': 1.5,
+        'sight_radius': 8
+    },
+    'Aquator': {
+        'char': 'A',
+        'color': (0, 191, 255),  # 水色
+        'hp': (5, 10),
+        'damage': (0, 0),  # 武器を錆びさせる特殊能力
+        'xp': 20,
+        'levels': (7, 16),
+        'speed': 1.0,
+        'sight_radius': 7,
+        'special': 'rust'
+    },
+    'Zombie': {
+        'char': 'Z',
+        'color': (169, 169, 169),  # 灰色
+        'hp': (6, 12),
+        'damage': (1, 8),
+        'xp': 6,
+        'levels': (4, 14),
+        'speed': 0.5,  # 遅い
+        'sight_radius': 6
+    },
+    'Troll': {
+        'char': 'T',
+        'color': (0, 100, 0),  # 濃い緑
+        'hp': (6, 16),
+        'damage': (2, 8),
+        'xp': 120,
+        'levels': (13, 26),
+        'speed': 1.0,
+        'sight_radius': 7,
+        'regeneration': True
+    },
+    'Dragon': {
+        'char': 'D',
+        'color': (255, 0, 0),  # 赤
+        'hp': (10, 20),
+        'damage': (3, 10),
+        'xp': 9000,
+        'levels': (21, 26),
+        'speed': 1.0,
+        'sight_radius': 8,
+        'special': 'fire'
+    }
+}
+
 class EntityType(Enum):
     PLAYER = auto()
     MONSTER = auto()
@@ -113,7 +200,10 @@ class Entity:
         xp: int = 0,
         xp_given: int = 0,
         level: int = 1,
-        dungeon_level: int = 1
+        dungeon_level: int = 1,
+        speed: float = 1.0,
+        special: Optional[str] = None,
+        regeneration: bool = False
     ):
         self.x = x
         self.y = y
@@ -135,6 +225,10 @@ class Entity:
         self.xp_given = xp_given
         self.level = level
         self.dungeon_level = dungeon_level
+        self.speed = speed
+        self.special = special
+        self.regeneration = regeneration
+        self.move_count = 0.0  # 移動カウンター
 
     def heal(self, amount: int) -> None:
         self.hp = min(self.hp + amount, self.max_hp)
@@ -298,14 +392,28 @@ class Entity:
             print(MESSAGES['nothing_here'])
 
     def take_turn(self, target: "Entity", game_map: "GameMap", entities: List["Entity"]) -> None:
+        # 移動カウンターを更新
+        self.move_count += self.speed
+        
+        # 移動カウンターが1未満なら行動しない
+        if self.move_count < 1.0:
+            return
+        
+        # 移動カウンターを1減らす
+        self.move_count -= 1.0
+
         if self.confused_turns > 0:
             self._handle_confusion(game_map, entities)
             return
 
+        # 再生能力の処理
+        if self.regeneration and self.hp < self.max_hp:
+            self.hp = min(self.hp + 1, self.max_hp)
+
         distance = self._distance_to(target)
         if distance < self.sight_radius:
             if distance <= 1:
-                self.attack(target, entities)
+                self._attack(target, entities)
             else:
                 self._move_towards(target.x, target.y, game_map, entities)
 
@@ -378,6 +486,28 @@ class Entity:
         print(f"Welcome to level {self.level}!")
         print(f"You feel much stronger! (+{hp_increase} HP)")
 
+    def _attack(self, target: "Entity", entities: List["Entity"]) -> None:
+        if self.special == 'rust':
+            # Aquatorの特殊能力：武器を錆びさせる
+            weapon = next((item for item in target.inventory 
+                         if item.entity_type == EntityType.WEAPON), None)
+            if weapon and weapon.power > 0:
+                weapon.power -= 1
+                print(f"Your {weapon.name} rusts!")
+                if weapon.power <= 0:
+                    target.inventory.remove(weapon)
+                    print(f"Your {weapon.name} crumbles to dust!")
+        elif self.special == 'fire':
+            # Dragonの特殊能力：火炎攻撃
+            damage = random.randint(3, 10) * 2  # 火炎攻撃は通常の2倍
+            target.take_damage(damage)
+            print(f"The {self.name} breathes fire! ({damage} damage)")
+        else:
+            # 通常攻撃
+            damage = random.randint(*self.power) if isinstance(self.power, tuple) else random.randint(1, self.power)
+            target.take_damage(damage)
+            print(f"The {self.name} hits you ({damage} damage).")
+
 class Tile:
     def __init__(self, walkable: bool, transparent: bool):
         self.walkable = walkable
@@ -438,25 +568,48 @@ class GameMap:
 
     def _place_monsters(self, room: Rectangle, entities: List[Entity]) -> None:
         number_of_monsters = random.randint(0, MAX_MONSTERS_PER_ROOM)
-        monster_chances = {'orc': 80, 'troll': 20}
+        
+        # 現在の階層で出現可能なモンスターをフィルタリング
+        possible_monsters = {
+            name: data for name, data in MONSTERS.items()
+            if data['levels'][0] <= self.dungeon_level <= data['levels'][1]
+        }
+        
+        if not possible_monsters:
+            return
 
         for _ in range(number_of_monsters):
             x = random.randint(room.x1 + 1, room.x2 - 1)
             y = random.randint(room.y1 + 1, room.y2 - 1)
 
             if not any(entity.x == x and entity.y == y for entity in entities):
-                if random.randint(1, 100) <= monster_chances['orc']:
-                    monster = Entity(
-                        x, y, CHARS['orc'], (63, 127, 63), 'Orc',
-                        EntityType.MONSTER, hp=10, max_hp=10,
-                        power=3, sight_radius=8, xp_given=5
-                    )
-                else:
-                    monster = Entity(
-                        x, y, CHARS['troll'], (0, 127, 0), 'Troll',
-                        EntityType.MONSTER, hp=16, max_hp=16,
-                        power=4, sight_radius=8, xp_given=10
-                    )
+                # ランダムにモンスターを選択
+                monster_name = random.choice(list(possible_monsters.keys()))
+                monster_data = possible_monsters[monster_name]
+                
+                # HPの計算 (例: 2d6なら2回d6を振って合計)
+                hp_dice, hp_sides = monster_data['hp']
+                hp = sum(random.randint(1, hp_sides) for _ in range(hp_dice))
+                
+                # ダメージの設定
+                damage_dice, damage_sides = monster_data['damage']
+                
+                monster = Entity(
+                    x=x,
+                    y=y,
+                    char=monster_data['char'],
+                    color=monster_data['color'],
+                    name=monster_name,
+                    entity_type=EntityType.MONSTER,
+                    hp=hp,
+                    max_hp=hp,
+                    power=monster_data['damage'],  # タプルとして保存
+                    sight_radius=monster_data['sight_radius'],
+                    xp_given=monster_data['xp'],
+                    speed=monster_data.get('speed', 1.0),
+                    special=monster_data.get('special', None),
+                    regeneration=monster_data.get('regeneration', False)
+                )
                 entities.append(monster)
 
     def _place_items(self, room: Rectangle, entities: List[Entity]) -> None:
