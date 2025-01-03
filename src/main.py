@@ -13,6 +13,7 @@ ROOM_MAX_SIZE = 10
 ROOM_MIN_SIZE = 6
 MAX_ROOMS = 30
 MAX_DUNGEON_LEVEL = 26  # 最大階層数
+AMULET_GENERATED = False  # イェンダーの魔除けが生成されたかどうか
 
 # エンティティの生成設定
 MAX_MONSTERS_PER_ROOM = 3
@@ -31,6 +32,7 @@ class EntityType(Enum):
     GOLD = auto()
     STAIRS_DOWN = auto()  # 下り階段
     STAIRS_UP = auto()    # 上り階段
+    AMULET = auto()  # イェンダーの魔除け
 
 class ItemEffect(Enum):
     HEAL = auto()
@@ -231,15 +233,17 @@ class Entity:
     def get_item(self, entities: List["Entity"]) -> None:
         """足元のアイテムを拾う"""
         for entity in entities:
-            if (entity.x == self.x and entity.y == self.y and 
-                entity.entity_type == EntityType.ITEM):
-                if len(self.inventory) < INVENTORY_CAPACITY:
-                    self.inventory.append(entity)
-                    entities.remove(entity)
-                    print(f"{entity.name}を拾いました。")
-                else:
-                    print("インベントリがいっぱいです！")
-                break
+            if entity.x == self.x and entity.y == self.y:
+                if entity.entity_type == EntityType.ITEM or entity.entity_type == EntityType.AMULET:
+                    if len(self.inventory) < INVENTORY_CAPACITY:
+                        self.inventory.append(entity)
+                        entities.remove(entity)
+                        print(f"{entity.name}を拾いました。")
+                        if entity.entity_type == EntityType.AMULET:
+                            print("You feel a powerful magic coursing through your body!")
+                    else:
+                        print("インベントリがいっぱいです！")
+                    break
         else:
             print("ここにはアイテムがありません。")
 
@@ -484,6 +488,7 @@ class GameMap:
 
     def make_map(self, player: Entity, entities: List[Entity]) -> None:
         """ダンジョンを生成し、エンティティを配置"""
+        global AMULET_GENERATED
         rooms: List[Rectangle] = []
 
         for r in range(MAX_ROOMS):
@@ -527,7 +532,20 @@ class GameMap:
                 
                 rooms.append(new_room)
 
-        # 最後の部屋に下り階段を配置（最下層以外）
+        # イェンダーの魔除けを20-25階のランダムな階層に配置（まだ生成されていない場合）
+        if not AMULET_GENERATED and 20 <= self.dungeon_level <= 25:
+            # 20%の確率で生成
+            if random.random() < 0.2:
+                amulet_x, amulet_y = rooms[-1].center
+                amulet = Entity(
+                    amulet_x, amulet_y, '"', (255, 255, 0), 'Amulet of Yendor',
+                    EntityType.AMULET, blocks=False
+                )
+                entities.append(amulet)
+                AMULET_GENERATED = True
+                print("You feel a powerful magical artifact nearby...")
+
+        # 最下層以外は下り階段を配置
         if self.dungeon_level < MAX_DUNGEON_LEVEL:
             stairs_x, stairs_y = rooms[-1].center
             stairs_down = Entity(
@@ -536,7 +554,7 @@ class GameMap:
             )
             entities.append(stairs_down)
 
-        # 最初の部屋に上り階段を配置（1階以外）
+        # 1階以外は上り階段を配置
         if self.dungeon_level > 1:
             stairs_x, stairs_y = rooms[0].center
             stairs_up = Entity(
@@ -551,7 +569,7 @@ def handle_input(event: tcod.event.Event, player: Entity, game_map: GameMap, ent
         return True
         
     if isinstance(event, tcod.event.KeyDown):
-        action_taken = False  # プレイヤーがアクションを実行したかどうか
+        action_taken = False
         
         # 移動キーの設定
         if event.sym in {
@@ -650,6 +668,13 @@ def handle_input(event: tcod.event.Event, player: Entity, game_map: GameMap, ent
             for entity in entities:
                 if (entity.x == player.x and entity.y == player.y and
                     entity.entity_type == EntityType.STAIRS_UP):
+                    # 1階で上り階段を使用し、イェンダーの魔除けを持っている場合は勝利
+                    if game_map.dungeon_level == 1 and any(
+                        item.entity_type == EntityType.AMULET for item in player.inventory
+                    ):
+                        print("You escaped with the Amulet of Yendor!")
+                        print("Congratulations! You won the game!")
+                        return True
                     return "previous_level"
         
         elif event.sym == tcod.event.KeySym.ESCAPE:
@@ -706,8 +731,8 @@ def main():
                     else:
                         root_console.print(x=x, y=y, string="#")
             
-            # エンティティの描画（アイテム/階段 → モンスター → プレイヤーの順）
-            for entity in [e for e in entities if e.entity_type in {EntityType.ITEM, EntityType.GOLD, EntityType.STAIRS_DOWN, EntityType.STAIRS_UP}]:
+            # エンティティの描画（アイテム/階段/魔除け → モンスター → プレイヤーの順）
+            for entity in [e for e in entities if e.entity_type in {EntityType.ITEM, EntityType.GOLD, EntityType.STAIRS_DOWN, EntityType.STAIRS_UP, EntityType.AMULET}]:
                 root_console.print(
                     x=entity.x,
                     y=entity.y,
@@ -747,6 +772,8 @@ def main():
                     player.dungeon_level += 1
                     entities = [player]
                     game_map.make_map(player, entities)
+                    if any(item.entity_type == EntityType.AMULET for item in player.inventory):
+                        print("The Amulet of Yendor pulses with mysterious energy...")
                     print(f"You descend to level {game_map.dungeon_level}")
                 elif result == "previous_level" and game_map.dungeon_level > 1:
                     # 前の階層へ
@@ -754,6 +781,8 @@ def main():
                     player.dungeon_level -= 1
                     entities = [player]
                     game_map.make_map(player, entities)
+                    if any(item.entity_type == EntityType.AMULET for item in player.inventory):
+                        print("The Amulet of Yendor pulses with mysterious energy...")
                     print(f"You ascend to level {game_map.dungeon_level}")
                 elif result is True:
                     running = False
