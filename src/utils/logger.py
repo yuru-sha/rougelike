@@ -1,77 +1,59 @@
-"""
-Logging utility for the game
-Handles all logging operations with rotation
-"""
+#!/usr/bin/env python3
 import logging
-from logging.handlers import RotatingFileHandler
 import os
+import glob
 from datetime import datetime
-from constants.game_constants import LOG_CONFIG
+from logging.handlers import RotatingFileHandler
 
-def get_logger(name: str) -> logging.Logger:
-    """
-    Configure and return a logger instance
-    
-    Args:
-        name: Logger name (usually __name__)
-        
-    Returns:
-        logging.Logger: Configured logger instance
-    """
+
+def setup_logger(name: str) -> logging.Logger:
+    """各コンポーネント用のロガーを設定"""
     logger = logging.getLogger(name)
-    
-    if not logger.handlers:
-        logger.setLevel(logging.DEBUG)
-        
-        # Create logs directory if not exists
-        log_dir = "logs"
-        if not os.path.exists(log_dir):
-            os.makedirs(log_dir)
-        
-        # Clean up old log files
-        _cleanup_old_logs(log_dir)
-            
-        # Include timestamp in filename
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        log_file = f"{log_dir}/roguelike_{timestamp}.log"
-        
-        # Setup rotating file handler
-        file_handler = RotatingFileHandler(
-            log_file,
-            maxBytes=LOG_CONFIG['MAX_FILE_SIZE'],
-            backupCount=LOG_CONFIG['BACKUP_COUNT']
-        )
-        file_handler.setLevel(logging.DEBUG)
-        
-        formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        )
-        file_handler.setFormatter(formatter)
-        
-        logger.addHandler(file_handler)
-    
+    logger.setLevel(logging.DEBUG)
+
+    # ログディレクトリがなければ作成
+    if not os.path.exists("logs"):
+        os.makedirs("logs")
+
+    # 古いログファイルを削除（最新5件を残す）
+    _cleanup_old_logs()
+
+    # ファイル出力用ハンドラ
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_file = f"logs/roguelike_{timestamp}.log"
+    fh = RotatingFileHandler(
+        log_file, maxBytes=10 * 1024 * 1024, backupCount=5, encoding="utf-8"  # 10MB
+    )
+    fh.setLevel(logging.DEBUG)
+
+    # コンソール出力用ハンドラ
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.INFO)
+
+    # フォーマッタを作成
+    formatter = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
+    fh.setFormatter(formatter)
+    ch.setFormatter(formatter)
+
+    # ハンドラをロガーに追加
+    logger.addHandler(fh)
+    logger.addHandler(ch)
+
     return logger
 
-def _cleanup_old_logs(log_dir: str, keep_count: int = LOG_CONFIG['BACKUP_COUNT'] + 1) -> None:
-    """
-    Remove old log files, keeping only the most recent ones
-    
-    Args:
-        log_dir: Directory containing log files
-        keep_count: Number of recent files to keep
-    """
-    log_files = []
-    for file in os.listdir(log_dir):
-        if file.startswith("roguelike_") and file.endswith(".log"):
-            full_path = os.path.join(log_dir, file)
-            log_files.append((full_path, os.path.getmtime(full_path)))
-    
-    # Sort by modification time
-    log_files.sort(key=lambda x: x[1], reverse=True)
-    
-    # Remove old files
-    for file_path, _ in log_files[keep_count:]:
-        try:
-            os.remove(file_path)
-        except OSError as e:
-            print(f"Error deleting log file {file_path}: {e}") 
+
+def _cleanup_old_logs() -> None:
+    """古いログファイルを削除（最新5件を残す）"""
+    pattern = "logs/roguelike_*.log"
+    files = glob.glob(pattern)
+    if len(files) > 5:
+        # タイムスタンプでソート
+        files.sort(key=lambda x: os.path.getctime(x), reverse=True)
+        # 古いファイルを削除
+        for file in files[5:]:
+            try:
+                os.remove(file)
+            except OSError:
+                pass

@@ -1,44 +1,78 @@
-# Rogue like
+# ローグライクゲーム
 
-## 概要
-このプロジェクトは、1980年代の古典的ローグライクゲーム「Rogue」のPython実装です。オリジナルの仕様と動作を可能な限り忠実に再現しつつ、モダンなコード設計を採用しています。
+オリジナルのRogue（1980年代）にインスパイアされた、TCODライブラリを使用したPython実装のローグライクゲームです。
+
+[English version here](README.md)
 
 ## 特徴
-- オリジナルRogueの忠実な再現
-- 手続き的ダンジョン生成
+
+- TCODライブラリを使用したクラシックなASCIIベースのグラフィックス
+- 自動生成されるダンジョン
 - ターンベースの戦闘システム
-- 伝統的なアスキーアート表示
-- スコアシステムとランキング機能
+- 様々なアイテムと装備
+- FOVとトラッキング機能を持つモンスターAI
+- クラシックなローグライクメカニクス（空腹度、インベントリ管理など）
 
-## 技術スタック
-- Python 3.8+
-- blessed (ターミナル操作)
-- injector (依存性注入)
-- dataclasses (データモデル)
+## 必要条件
 
-## インストール
+- Python 3.9以上
+- TCODライブラリ
+- その他の依存関係は`requirements.txt`に記載
 
+## インストール方法
+
+1. リポジトリのクローン:
 ```bash
-git clone https://github.com/yuru-sha/roguelike.git
+git clone https://github.com/yourusername/roguelike.git
 cd roguelike
+```
+
+2. 仮想環境の作成（推奨）:
+```bash
+python -m venv venv
+source venv/bin/activate  # Windowsの場合: venv\Scripts\activate
+```
+
+3. 依存関係のインストール:
+```bash
 pip install -r requirements.txt
 ```
 
-## 実行方法
+## プレイ方法
 
+ゲームの起動:
 ```bash
 python src/main.py
 ```
 
-## プロジェクト構造
+### 操作方法
 
+- 矢印キーまたはhjkl: 移動
+- g: アイテムを拾う
+- i: インベントリを開く
+- d: アイテムを落とす
+- ESC: ゲーム終了
+- ?: ヘルプ
+
+## 開発
+
+開発用の追加依存関係のインストール:
+```bash
+pip install -r requirements-dev.txt
 ```
-src/
-├── core/ # ゲームエンジンとコアロジック
-├── entities/ # ゲーム内エンティティ
-├── utils/ # ユーティリティ関数
-└── constants/ # ゲーム定数
+
+テストの実行:
+```bash
+pytest
 ```
 
 ## ライセンス
-MIT License
+
+このプロジェクトはMITライセンスの下で公開されています - 詳細はLICENSEファイルを参照してください。
+
+## 謝辞
+
+- オリジナルのRogueゲーム制作者
+- TCODライブラリ開発者
+- Pythonコミュニティ
+- Cursor - AIペアプログラミングアシスタント 
