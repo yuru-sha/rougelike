@@ -118,16 +118,16 @@ class Entity:
     def heal(self, amount: int) -> None:
         """HPを回復する"""
         self.hp = min(self.hp + amount, self.max_hp)
-        print(f"HPが{amount}回復しました。現在のHP: {self.hp}/{self.max_hp}")
+        print(f"The healing potion heals {amount} hit points.")
 
     def take_damage(self, amount: int) -> None:
         """ダメージを受ける"""
         self.hp = max(0, self.hp - amount)
         if self.hp == 0:
             if self.entity_type == EntityType.MONSTER:
-                print(f"{self.name}を倒しました！")
+                print(f"The {self.name} dies.")
             else:
-                print(f"{amount}のダメージを受けました。現在のHP: {self.hp}/{self.max_hp}")
+                print(f"The {self.name} hits you. ({amount} damage)")
 
     def drop_item(self, item: "Entity", entities: List["Entity"]) -> None:
         """アイテムを足元にドロップする"""
@@ -136,7 +136,7 @@ class Entity:
             item.x = self.x
             item.y = self.y
             entities.append(item)
-            print(f"{item.name}をドロップしました。")
+            print(f"You drop {item.name}.")
 
     def use_item(self, item: "Entity", entities: List["Entity"], game_map: "GameMap") -> None:
         """アイテムを使用する"""
@@ -150,11 +150,10 @@ class Entity:
                 self.heal(item.effect_amount)
                 used = True
             else:
-                print("HPが満タンです！")
+                print("You are already at full health.")
                 return
 
         elif item.effect == ItemEffect.LIGHTNING:
-            # 最も近いモンスターにダメージ
             closest_monster = None
             closest_distance = float('inf')
             for entity in entities:
@@ -164,15 +163,15 @@ class Entity:
                         closest_monster = entity
                         closest_distance = distance
             
-            if closest_monster and closest_distance <= 5:  # 射程範囲を5マスに制限
+            if closest_monster and closest_distance <= 5:
                 closest_monster.take_damage(item.effect_amount)
+                print(f"Lightning strikes the {closest_monster.name}!")
                 used = True
             else:
-                print("射程範囲内にモンスターがいません。")
+                print("The scroll fizzles out.")
                 return
 
         elif item.effect == ItemEffect.FIREBALL:
-            # 自分の周囲のモンスターにダメージ
             radius = 3
             affected_monsters = []
             for entity in entities:
@@ -184,14 +183,13 @@ class Entity:
             if affected_monsters:
                 for monster in affected_monsters:
                     monster.take_damage(item.effect_amount)
+                print("The scroll explodes in a ball of fire!")
                 used = True
-                print(f"{item.name}を使用し、{len(affected_monsters)}体のモンスターに{item.effect_amount}のダメージを与えました！")
             else:
-                print("範囲内にモンスターがいません。")
+                print("The scroll fizzles out.")
                 return
 
         elif item.effect == ItemEffect.CONFUSION:
-            # 最も近いモンスターを混乱させる
             closest_monster = None
             closest_distance = float('inf')
             for entity in entities:
@@ -201,17 +199,16 @@ class Entity:
                         closest_monster = entity
                         closest_distance = distance
             
-            if closest_monster and closest_distance <= 3:  # 射程範囲を3マスに制限
+            if closest_monster and closest_distance <= 3:
                 closest_monster.confused_turns = item.effect_amount
+                print(f"The {closest_monster.name} appears confused!")
                 used = True
-                print(f"{closest_monster.name}を{item.effect_amount}ターンの間、混乱させました！")
             else:
-                print("射程範囲内にモンスターがいません。")
+                print("The scroll fizzles out.")
                 return
 
         elif item.effect == ItemEffect.TELEPORT:
-            # ランダムな場所にテレポート
-            for _ in range(100):  # 最大100回試行
+            for _ in range(100):
                 new_x = random.randint(1, game_map.width - 2)
                 new_y = random.randint(1, game_map.height - 2)
                 if (game_map.tiles[new_x][new_y].walkable and
@@ -219,11 +216,11 @@ class Entity:
                            for entity in entities)):
                     self.x = new_x
                     self.y = new_y
+                    print("You teleport...")
                     used = True
-                    print(f"{item.name}を使用し、ランダムな場所にテレポートしました！")
                     break
             else:
-                print("テレポートに失敗しました。")
+                print("The scroll fizzles out.")
                 return
 
         if used:
@@ -241,7 +238,7 @@ class Entity:
                     # ゴールドは自動で拾う
                     self.gold_amount += entity.gold_amount
                     entities.remove(entity)
-                    print(f"{entity.gold_amount}ゴールドを拾いました。所持金: {self.gold_amount}")
+                    print(f"You found {entity.gold_amount} gold pieces.")
                     break
                 elif entity.entity_type == EntityType.MONSTER and self.entity_type == EntityType.PLAYER:
                     # プレイヤーがモンスターに移動しようとした場合は攻撃
@@ -266,14 +263,14 @@ class Entity:
                     if len(self.inventory) < INVENTORY_CAPACITY:
                         self.inventory.append(entity)
                         entities.remove(entity)
-                        print(f"{entity.name}を拾いました。")
+                        print(f"You pick up {entity.name}.")
                         if entity.entity_type == EntityType.AMULET:
-                            print("You feel a powerful magic coursing through your body!")
+                            print("You feel a surge of power!")
                     else:
-                        print("インベントリがいっぱいです！")
+                        print("You cannot carry any more.")
                     break
         else:
-            print("ここにはアイテムがありません。")
+            print("There is nothing here.")
 
     def distance_to(self, other: "Entity") -> float:
         """他のエンティティまでの距離を計算"""
@@ -302,12 +299,15 @@ class Entity:
         """他のエンティティを攻撃"""
         damage = self.power
         target.take_damage(damage)
-        print(f"{self.name}が{target.name}に{damage}のダメージを与えました！")
+        if self.entity_type == EntityType.PLAYER:
+            print(f"You hit the {target.name}.")
+        else:
+            print(f"The {self.name} hits you.")
         
         if target.hp <= 0 and target.entity_type == EntityType.MONSTER:
             entities.remove(target)
             if self.entity_type == EntityType.PLAYER:
-                self.add_xp(target.xp_given)  # 経験値を獲得
+                self.add_xp(target.xp_given)
 
     def take_turn(self, target: "Entity", game_map: "GameMap", entities: List["Entity"]) -> None:
         """モンスターのターン処理"""
@@ -316,7 +316,7 @@ class Entity:
             self.move_randomly(game_map, entities)
             self.confused_turns -= 1
             if self.confused_turns == 0:
-                print(f"{self.name}の混乱が解けました。")
+                print(f"The {self.name} is no longer confused.")
             return
 
         distance = self.distance_to(target)
@@ -333,16 +333,14 @@ class Entity:
         """レベルアップ処理"""
         self.level += 1
         self.max_hp += 5
-        self.hp = self.max_hp  # レベルアップ時にHP全回復
+        self.hp = self.max_hp
         self.power += 2
-        print(f"レベルアップ！ Level {self.level}")
-        print(f"最大HP +5 (現在: {self.max_hp})")
-        print(f"攻撃力 +2 (現在: {self.power})")
+        print(f"Welcome to level {self.level}!")
+        print("You feel stronger!")
 
     def add_xp(self, amount: int) -> None:
         """経験値を追加し、必要に応じてレベルアップ"""
         self.xp += amount
-        print(f"{amount}の経験値を獲得！ (現在: {self.xp})")
         
         # レベルアップに必要な経験値を計算
         xp_to_next_level = self.level * 10
@@ -716,7 +714,7 @@ def handle_input(event: tcod.event.Event, player: Entity, game_map: GameMap, ent
             
             # プレイヤーの死亡判定
             if player.hp <= 0:
-                print("あなたは死亡しました...")
+                print("You have died...")
                 return True
     
     return None
