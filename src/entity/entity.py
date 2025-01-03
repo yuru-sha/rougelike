@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 from enum import Enum, auto
-from typing import Optional, List, Tuple, Dict, Any
+from typing import Optional, List, Tuple, Dict, Any, TYPE_CHECKING
 import random
 from config.messages import MESSAGES
+from utils.logger import setup_logger
+
+if TYPE_CHECKING:
+    from map.game_map import GameMap
 
 class EntityType(Enum):
     PLAYER = auto()
@@ -71,6 +75,9 @@ class Entity:
         stack_size: Optional[int] = None,  # 最大スタックサイズ
         count: Optional[int] = None  # 現在のスタック数
     ):
+        self.logger = setup_logger('entity')
+        self.logger.debug(f'Creating entity: {name} ({entity_type})')
+        
         self.x = x
         self.y = y
         self.char = char

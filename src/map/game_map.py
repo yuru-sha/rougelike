@@ -2,6 +2,7 @@
 from typing import List, Optional, Dict, Any, Tuple
 import random
 from .tile import Tile, Rectangle
+from utils.logger import setup_logger
 from config.constants import (
     ROOM_MIN_SIZE, ROOM_MAX_SIZE, MAX_ROOMS,
     MAX_MONSTERS_PER_ROOM, MAX_ITEMS_PER_ROOM, MAX_GOLD_PER_ROOM,
@@ -18,12 +19,18 @@ from entity.entity import Entity, EntityType
 
 class GameMap:
     def __init__(self, width: int, height: int, dungeon_level: int):
+        self.logger = setup_logger('map')
+        self.logger.info(f'Initializing map for dungeon level {dungeon_level}')
+        
         self.width = width
         self.height = height
         self.dungeon_level = dungeon_level
         self.tiles = self._initialize_tiles()
         self.visible = [[False for y in range(height)] for x in range(width)]
         self.explored = [[False for y in range(height)] for x in range(width)]
+        self.rooms: List[Rectangle] = []
+        
+        self.logger.debug(f'Map initialized with size {width}x{height}')
     
     def _initialize_tiles(self) -> List[List[Tile]]:
         return [[Tile(walkable=False, transparent=False)
@@ -231,8 +238,8 @@ class GameMap:
                 entities.append(gold)
 
     def make_map(self, player: Entity, entities: List[Entity]) -> None:
-        self.rooms: List[Rectangle] = []
-
+        self.logger.info('Generating new dungeon map')
+        
         for _ in range(MAX_ROOMS):
             room = self._create_random_room()
             
@@ -241,18 +248,19 @@ class GameMap:
                 new_x, new_y = room.center
                 
                 if not self.rooms:
-                    # プレイヤーを最初の部屋の中心に配置
+                    self.logger.debug(f'Placing player at ({new_x}, {new_y})')
                     player.x, player.y = new_x, new_y
-                    # 初期FOVを計算
                     self.compute_fov(player.x, player.y, player.sight_radius)
                 else:
                     prev_x, prev_y = self.rooms[-1].center
+                    self.logger.debug(f'Connecting rooms at ({prev_x}, {prev_y}) and ({new_x}, {new_y})')
                     self._connect_rooms(prev_x, prev_y, new_x, new_y)
                 
                 self._place_entities(room, entities)
                 self.rooms.append(room)
 
         self._place_special_entities(self.rooms, player, entities)
+        self.logger.info(f'Map generation complete with {len(self.rooms)} rooms')
 
     def _create_random_room(self) -> Rectangle:
         w = random.randint(ROOM_MIN_SIZE, ROOM_MAX_SIZE)

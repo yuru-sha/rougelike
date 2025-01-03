@@ -1,80 +1,60 @@
+#!/usr/bin/env python3
 import logging
-import sys
+import os
+import glob
 from datetime import datetime
-from logging import FileHandler, StreamHandler
-from pathlib import Path
+from logging.handlers import RotatingFileHandler
 
-
-def cleanup_old_logs(log_dir: Path, prefix: str, keep_files: int = 5) -> None:
-    """
-    古いログファイルを削除します。
-
-    Args:
-        log_dir (Path): ログディレクトリのパス
-        prefix (str): ログファイルのプレフィックス
-        keep_files (int): 保持するファイル数
-    """
-    log_files = sorted(
-        [f for f in log_dir.glob(f"{prefix}*.log")],
-        key=lambda x: x.stat().st_mtime,
-        reverse=True,
-    )
-
-    for old_file in log_files[keep_files:]:
-        old_file.unlink()
-
-
-def setup_logger(name: str = "roguelike") -> logging.Logger:
-    """
-    ロガーの設定を行い、設定済みのロガーインスタンスを返します。
-
-    Args:
-        name (str): ロガーの名前。デフォルトは "roguelike"
-
-    Returns:
-        logging.Logger: 設定済みのロガーインスタンス
-    """
-    # ロガーの取得
+def setup_logger(name: str) -> logging.Logger:
+    """各コンポーネント用のロガーを設定"""
     logger = logging.getLogger(name)
-
-    # 既に設定済みの場合は、そのまま返す
-    if logger.handlers:
-        return logger
-
-    # ログレベルの設定
     logger.setLevel(logging.DEBUG)
 
-    # フォーマッターの作成
-    formatter = logging.Formatter(
-        "[%(asctime)s] %(levelname)s - %(name)s - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
+    # ログディレクトリがなければ作成
+    if not os.path.exists('logs'):
+        os.makedirs('logs')
+
+    # 古いログファイルを削除（最新5件を残す）
+    _cleanup_old_logs()
+
+    # ファイル出力用ハンドラ
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    log_file = f'logs/roguelike_{timestamp}.log'
+    fh = RotatingFileHandler(
+        log_file,
+        maxBytes=10*1024*1024,  # 10MB
+        backupCount=5,
+        encoding='utf-8'
     )
+    fh.setLevel(logging.DEBUG)
 
-    # コンソール出力用ハンドラーの設定
-    console_handler = StreamHandler(sys.stdout)
-    console_handler.setLevel(logging.INFO)
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
+    # コンソール出力用ハンドラ
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.INFO)
 
-    # フグディレクトリの設定
-    log_dir = Path("logs")
-    log_dir.mkdir(exist_ok=True)
+    # フォーマッタを作成
+    formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    fh.setFormatter(formatter)
+    ch.setFormatter(formatter)
 
-    # 現在時刻を含むファイル名の生成
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_file = log_dir / f"roguelike_{timestamp}.log"
-
-    # ファイル出力用ハンドラーの設定
-    file_handler = FileHandler(log_file, encoding="utf-8")
-    file_handler.setLevel(logging.DEBUG)
-    file_handler.setFormatter(formatter)
-    logger.addHandler(file_handler)
-
-    # 古いログファイルの削除
-    cleanup_old_logs(log_dir, "roguelike_")
+    # ハンドラをロガーに追加
+    logger.addHandler(fh)
+    logger.addHandler(ch)
 
     return logger
 
-
-# デフォルトのロガーインスタンスを作成
-logger = setup_logger()
+def _cleanup_old_logs() -> None:
+    """古いログファイルを削除（最新5件を残す）"""
+    pattern = 'logs/roguelike_*.log'
+    files = glob.glob(pattern)
+    if len(files) > 5:
+        # タイムスタンプでソート
+        files.sort(key=lambda x: os.path.getctime(x), reverse=True)
+        # 古いファイルを削除
+        for file in files[5:]:
+            try:
+                os.remove(file)
+            except OSError:
+                pass

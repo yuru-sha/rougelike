@@ -5,13 +5,17 @@ from tcod import libtcodpy
 from entity.entity import Entity, EntityType
 from map.game_map import GameMap
 from config.constants import SCREEN_WIDTH, SCREEN_HEIGHT, MAP_HEIGHT
+from utils.logger import setup_logger
 
 class Renderer:
     def __init__(self, console: tcod.console.Console):
+        self.logger = setup_logger('renderer')
+        self.logger.info('Initializing renderer')
         self.console = console
         self.game_map = None
 
     def render_all(self, entities: List[Entity], game_map: GameMap, player: Entity) -> None:
+        self.logger.debug('Rendering frame')
         # コンソールを完全にクリア
         self.console.clear()
         

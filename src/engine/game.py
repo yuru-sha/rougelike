@@ -5,6 +5,7 @@ from tcod.event import KeySym
 from entity.entity import Entity, EntityType
 from map.game_map import GameMap
 from .render import Renderer
+from utils.logger import setup_logger
 from config.constants import (
     SCREEN_WIDTH, SCREEN_HEIGHT, MAP_WIDTH, MAP_HEIGHT,
     INVENTORY_CAPACITY, TITLE,
@@ -17,12 +18,17 @@ from config.items import MELEE_WEAPONS, RANGED_WEAPONS, AMMO, FOODS
 
 class Game:
     def __init__(self):
+        self.logger = setup_logger('game')
+        self.logger.info('Game initializing...')
+        
         self.player = self._create_player()
         self.entities: List[Entity] = [self.player]
         self.game_map = GameMap(MAP_WIDTH, MAP_HEIGHT, 1)
         self.game_map.make_map(self.player, self.entities)
         self._equip_player(self.player)
         self.game_map.compute_fov(self.player.x, self.player.y, self.player.sight_radius)
+        
+        self.logger.info('Game initialized successfully')
 
     def _create_player(self) -> Entity:
         player = Entity(
