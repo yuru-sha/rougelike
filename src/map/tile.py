@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 from dataclasses import dataclass
 
+
 @dataclass
 class Tile:
     """
     A tile on a map. It may or may not be blocked, and may or may not block sight.
     """
+
     walkable: bool
     transparent: bool
 
@@ -13,11 +15,13 @@ class Tile:
         self.walkable = walkable
         self.transparent = transparent
 
+
 @dataclass
 class Rectangle:
     """
     A rectangle on the map, used to characterize a room.
     """
+
     x: int
     y: int
     w: int
@@ -41,5 +45,9 @@ class Rectangle:
 
     def intersects(self, other: "Rectangle") -> bool:
         """Returns true if this rectangle intersects with another one."""
-        return (self.x1 <= other.x2 and self.x2 >= other.x1 and
-                self.y1 <= other.y2 and self.y2 >= other.y1) 
+        return (
+            self.x1 <= other.x2
+            and self.x2 >= other.x1
+            and self.y1 <= other.y2
+            and self.y2 >= other.y1
+        )

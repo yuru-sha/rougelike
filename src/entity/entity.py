@@ -8,6 +8,7 @@ from utils.logger import setup_logger
 if TYPE_CHECKING:
     from map.game_map import GameMap
 
+
 class EntityType(Enum):
     PLAYER = auto()
     MONSTER = auto()
@@ -24,6 +25,7 @@ class EntityType(Enum):
     SHIELD = auto()
     RING = auto()
 
+
 class ItemEffect(Enum):
     HEAL = auto()
     LIGHTNING = auto()
@@ -31,6 +33,7 @@ class ItemEffect(Enum):
     CONFUSION = auto()
     TELEPORT = auto()
     IDENTIFY = auto()
+
 
 class Entity:
     def __init__(
@@ -42,7 +45,7 @@ class Entity:
         name: str,
         entity_type: EntityType,
         blocks: bool = True,
-        inventory: Optional[List['Entity']] = None,
+        inventory: Optional[List["Entity"]] = None,
         hp: Optional[int] = None,
         max_hp: Optional[int] = None,
         power: Optional[Tuple[int, int]] = None,
@@ -73,11 +76,11 @@ class Entity:
         weight: int = 0,
         gold: int = 0,
         stack_size: Optional[int] = None,  # 最大スタックサイズ
-        count: Optional[int] = None  # 現在のスタック数
+        count: Optional[int] = None,  # 現在のスタック数
     ):
-        self.logger = setup_logger('entity')
-        self.logger.debug(f'Creating entity: {name} ({entity_type})')
-        
+        self.logger = setup_logger("entity")
+        self.logger.debug(f"Creating entity: {name} ({entity_type})")
+
         self.x = x
         self.y = y
         self.char = char
@@ -126,21 +129,21 @@ class Entity:
             return f"{self.name} ({self.count})"
         return self.name
 
-    def can_stack_with(self, other: 'Entity') -> bool:
+    def can_stack_with(self, other: "Entity") -> bool:
         """別のアイテムとスタック可能かチェック"""
         if not self.stack_size or not other.stack_size:
             return False
-        
+
         return (
-            self.entity_type == other.entity_type and
-            self.name == other.name and
-            self.effect == other.effect and
-            self.effect_amount == other.effect_amount and
-            self.ammo_type == other.ammo_type and
-            self.damage_dice == other.damage_dice
+            self.entity_type == other.entity_type
+            and self.name == other.name
+            and self.effect == other.effect
+            and self.effect_amount == other.effect_amount
+            and self.ammo_type == other.ammo_type
+            and self.damage_dice == other.damage_dice
         )
 
-    def stack_with(self, other: 'Entity') -> bool:
+    def stack_with(self, other: "Entity") -> bool:
         """別のアイテムとスタックを試みる"""
         if not self.can_stack_with(other):
             return False
@@ -151,23 +154,26 @@ class Entity:
             return True
         return False
 
-    def split_stack(self, amount: int) -> Optional['Entity']:
+    def split_stack(self, amount: int) -> Optional["Entity"]:
         """スタックを分割する"""
         if not self.stack_size or amount >= self.count or amount < 1:
             return None
 
         # 新しいエンティティを作成
         new_entity = Entity(
-            self.x, self.y,
-            self.char, self.color,
-            self.name, self.entity_type,
+            self.x,
+            self.y,
+            self.char,
+            self.color,
+            self.name,
+            self.entity_type,
             blocks=self.blocks,
             effect=self.effect,
             effect_amount=self.effect_amount,
             ammo_type=self.ammo_type,
             damage_dice=self.damage_dice,
             stack_size=self.stack_size,
-            count=amount
+            count=amount,
         )
 
         self.count -= amount
@@ -195,20 +201,22 @@ class Entity:
         item.y = self.y
         entities.append(item)
 
-    def use_item(self, item: "Entity", entities: List["Entity"], game_map: "GameMap") -> None:
-        if item.effect == 'heal':
+    def use_item(
+        self, item: "Entity", entities: List["Entity"], game_map: "GameMap"
+    ) -> None:
+        if item.effect == "heal":
             if self._use_healing_item(item):
                 self.inventory.remove(item)
-        elif item.effect == 'lightning':
+        elif item.effect == "lightning":
             if self._use_lightning_scroll(item, entities):
                 self.inventory.remove(item)
-        elif item.effect == 'fireball':
+        elif item.effect == "fireball":
             if self._use_fireball_scroll(item, entities):
                 self.inventory.remove(item)
-        elif item.effect == 'confusion':
+        elif item.effect == "confusion":
             if self._use_confusion_scroll(item, entities):
                 self.inventory.remove(item)
-        elif item.effect == 'teleport':
+        elif item.effect == "teleport":
             if self._use_teleport_scroll(game_map):
                 self.inventory.remove(item)
 
@@ -250,24 +258,35 @@ class Entity:
                 return True
         return False
 
-    def _find_closest_monster(self, entities: List["Entity"], max_distance: int) -> Optional["Entity"]:
+    def _find_closest_monster(
+        self, entities: List["Entity"], max_distance: int
+    ) -> Optional["Entity"]:
         closest_monster = None
         closest_distance = max_distance + 1
 
         for entity in entities:
-            if (entity.entity_type == EntityType.MONSTER and
-                self._distance_to(entity) < closest_distance):
+            if (
+                entity.entity_type == EntityType.MONSTER
+                and self._distance_to(entity) < closest_distance
+            ):
                 closest_monster = entity
                 closest_distance = self._distance_to(entity)
 
         return closest_monster
 
-    def _find_monsters_in_radius(self, entities: List["Entity"], radius: int) -> List["Entity"]:
-        return [entity for entity in entities
-                if entity.entity_type == EntityType.MONSTER
-                and self._distance_to(entity) <= radius]
+    def _find_monsters_in_radius(
+        self, entities: List["Entity"], radius: int
+    ) -> List["Entity"]:
+        return [
+            entity
+            for entity in entities
+            if entity.entity_type == EntityType.MONSTER
+            and self._distance_to(entity) <= radius
+        ]
 
-    def move(self, dx: int, dy: int, game_map: "GameMap", entities: List["Entity"]) -> None:
+    def move(
+        self, dx: int, dy: int, game_map: "GameMap", entities: List["Entity"]
+    ) -> None:
         new_x = self.x + dx
         new_y = self.y + dy
 
@@ -277,15 +296,24 @@ class Entity:
 
             # ゴールドの自動拾い
             for entity in list(entities):  # リストのコピーを作成して反復
-                if (entity.entity_type == EntityType.GOLD and
-                    entity.x == self.x and entity.y == self.y):
+                if (
+                    entity.entity_type == EntityType.GOLD
+                    and entity.x == self.x
+                    and entity.y == self.y
+                ):
                     self._collect_gold(entity, entities)
                     break
 
-    def _is_valid_move(self, x: int, y: int, game_map: "GameMap", entities: List["Entity"]) -> bool:
-        return (game_map.in_bounds(x, y) and game_map.tiles[x][y].walkable and
-                not any(entity.blocks and entity.x == x and entity.y == y
-                       for entity in entities))
+    def _is_valid_move(
+        self, x: int, y: int, game_map: "GameMap", entities: List["Entity"]
+    ) -> bool:
+        return (
+            game_map.in_bounds(x, y)
+            and game_map.tiles[x][y].walkable
+            and not any(
+                entity.blocks and entity.x == x and entity.y == y for entity in entities
+            )
+        )
 
     def _collect_gold(self, gold: "Entity", entities: List["Entity"]) -> None:
         self.gold += gold.gold_amount  # goldプロパティに加算
@@ -317,7 +345,9 @@ class Entity:
                         entities.remove(entity)
                     break
 
-    def take_turn(self, target: "Entity", game_map: "GameMap", entities: List["Entity"]) -> None:
+    def take_turn(
+        self, target: "Entity", game_map: "GameMap", entities: List["Entity"]
+    ) -> None:
         # 移動カウンターを更新
         self.move_count += self.speed
         if self.move_count < 1.0:
@@ -339,7 +369,7 @@ class Entity:
                 self.attack(target, entities)
             else:
                 self._move_towards(target.x, target.y, game_map, entities)
-        
+
         # 移動カウンターをリセット
         self.move_count -= 1.0
 
@@ -355,7 +385,7 @@ class Entity:
     def _distance_to(self, other: "Entity") -> float:
         dx = other.x - self.x
         dy = other.y - self.y
-        return (dx ** 2 + dy ** 2) ** 0.5
+        return (dx**2 + dy**2) ** 0.5
 
     def _add_xp(self, amount: int) -> None:
         """
@@ -393,18 +423,18 @@ class Entity:
         - 筋力は19以上は10%の確率で1上昇（最大25まで）
         """
         import random
-        
+
         # HP増加 (4-8)
         hp_increase = random.randint(4, 8)
         self.max_hp += hp_increase
         self.hp = self.max_hp  # HPを全回復
-        
+
         # 筋力増加
         if self.strength < 18 and random.random() < 0.5:
             self.strength += 1
         elif 18 <= self.strength < 25 and random.random() < 0.1:
             self.strength += 1
-        
+
         # 基本攻撃力の増加（レベルに応じて）
         if isinstance(self.power, tuple):
             min_damage, max_damage = self.power
@@ -416,10 +446,16 @@ class Entity:
                 max_damage += 1
             self.power = (min_damage, max_damage)
 
-    def _move_towards(self, target_x: int, target_y: int, game_map: "GameMap", entities: List["Entity"]) -> None:
+    def _move_towards(
+        self,
+        target_x: int,
+        target_y: int,
+        game_map: "GameMap",
+        entities: List["Entity"],
+    ) -> None:
         dx = target_x - self.x
         dy = target_y - self.y
-        distance = (dx ** 2 + dy ** 2) ** 0.5
+        distance = (dx**2 + dy**2) ** 0.5
 
         dx = int(round(dx / distance))
         dy = int(round(dy / distance))
@@ -432,17 +468,18 @@ class Entity:
         hit_bonus = 0
 
         # 装備中の武器を探す
-        weapon = next((item for item in self.inventory
-                      if item.entity_type == EntityType.WEAPON), None)
+        weapon = next(
+            (item for item in self.inventory if item.entity_type == EntityType.WEAPON),
+            None,
+        )
 
         if weapon and weapon.damage_dice:
             dice_count, dice_sides = weapon.damage_dice
-            damage = sum(random.randint(1, dice_sides)
-                        for _ in range(dice_count))
+            damage = sum(random.randint(1, dice_sides) for _ in range(dice_count))
             hit_bonus = weapon.hit_bonus
 
         # 特殊能力の処理
-        if self.special == 'rust' and target.inventory:
+        if self.special == "rust" and target.inventory:
             # 武器や防具を錆びさせる
             for item in target.inventory:
                 if item.entity_type in [EntityType.WEAPON, EntityType.ARMOR]:
@@ -450,7 +487,7 @@ class Entity:
                         item.hit_bonus -= 1
                     if item.defense > 0:
                         item.defense -= 1
-        elif self.special == 'fire':
+        elif self.special == "fire":
             # 追加の火炎ダメージ
             damage += random.randint(3, 6)
 
@@ -500,18 +537,18 @@ class Entity:
         - 筋力は19以上は10%の確率で1上昇（最大25まで）
         """
         import random
-        
+
         # HP増加 (4-8)
         hp_increase = random.randint(4, 8)
         self.max_hp += hp_increase
         self.hp = self.max_hp  # HPを全回復
-        
+
         # 筋力増加
         if self.strength < 18 and random.random() < 0.5:
             self.strength += 1
         elif 18 <= self.strength < 25 and random.random() < 0.1:
             self.strength += 1
-        
+
         # 基本攻撃力の増加（レベルに応じて）
         if isinstance(self.power, tuple):
             min_damage, max_damage = self.power
@@ -521,4 +558,4 @@ class Entity:
             # レベル2,4,6,8ごとに最大ダメージ+1
             if self.level % 2 == 0:
                 max_damage += 1
-            self.power = (min_damage, max_damage) 
+            self.power = (min_damage, max_damage)
