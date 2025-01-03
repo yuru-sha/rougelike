@@ -29,27 +29,22 @@ STARTING_WEAPON_POWER = 3  # 短剣の攻撃力
 STARTING_ARROWS = 25      # 矢の数
 STARTING_FOOD = 1200      # 食料の量（ターン数）
 
-# タイルセットの設定
-TILE_WIDTH = 16
-TILE_HEIGHT = 16
-TILESET_COLUMNS = 16
-
-# タイルのインデックス
-TILE_PLAYER = 64        # @
-TILE_WALL = 35         # #
-TILE_FLOOR = 46        # .
-TILE_ORC = 111         # o
-TILE_TROLL = 84        # T
-TILE_STAIRS_DOWN = 16 * 6 + 3  # > (3,6)
-TILE_STAIRS_UP = 16 * 6 + 2    # < (2,6)
-TILE_POTION = 33       # !
-TILE_SCROLL = 63       # ?
-TILE_GOLD = 36         # $
-TILE_AMULET = 34       # "
-TILE_WEAPON = 41       # )
-TILE_BOW = 125         # }
-TILE_ARROW = 93        # ]
-TILE_FOOD = 37         # %
+# キャラクター表示設定
+PLAYER_CHAR = '@'
+WALL_CHAR = '#'
+FLOOR_CHAR = '.'
+ORC_CHAR = 'o'
+TROLL_CHAR = 'T'
+STAIRS_DOWN_CHAR = '>'
+STAIRS_UP_CHAR = '<'
+POTION_CHAR = '!'
+SCROLL_CHAR = '?'
+GOLD_CHAR = '$'
+AMULET_CHAR = '"'
+WEAPON_CHAR = ')'
+BOW_CHAR = '}'
+ARROW_CHAR = ']'
+FOOD_CHAR = '%'
 
 TITLE = "Roguelike Game"
 
@@ -768,13 +763,6 @@ def create_starting_equipment() -> List[Entity]:
     return equipment
 
 def main():
-    # タイルセットの設定
-    tileset = tcod.tileset.load_tilesheet(
-        "assets/fonts/dejavu10x10_gs_tc.png",
-        32, 8,
-        tcod.tileset.CHARMAP_TCOD
-    )
-
     # エンティティリストの作成（プレイヤーを含む）
     player = Entity(0, 0, '@', (255, 255, 255), 'Player', EntityType.PLAYER,
                    gold_amount=0, hp=30, max_hp=30, power=1,  # 素手の攻撃力は1
@@ -797,13 +785,12 @@ def main():
 
     # コンソールの初期化
     with tcod.context.new_terminal(
-        SCREEN_WIDTH * TILE_WIDTH,
-        SCREEN_HEIGHT * TILE_HEIGHT,
-        tileset=tileset,
+        SCREEN_WIDTH,
+        SCREEN_HEIGHT,
         title=TITLE,
         vsync=True,
     ) as context:
-        root_console = tcod.console.Console(SCREEN_WIDTH, SCREEN_HEIGHT, order="F")
+        root_console = tcod.console.Console(SCREEN_WIDTH, SCREEN_HEIGHT)
         
         running = True
         while running:
@@ -813,43 +800,40 @@ def main():
             for x in range(game_map.width):
                 for y in range(game_map.height):
                     if game_map.tiles[x][y].walkable:
-                        root_console.tiles_rgb[x, y]["ch"] = TILE_FLOOR
+                        root_console.print(x=x, y=y, string=FLOOR_CHAR)
                     else:
-                        root_console.tiles_rgb[x, y]["ch"] = TILE_WALL
+                        root_console.print(x=x, y=y, string=WALL_CHAR)
             
             # エンティティの描画（アイテム/階段/魔除け → モンスター → プレイヤーの順）
             for entity in [e for e in entities if e.entity_type in {EntityType.ITEM, EntityType.GOLD, EntityType.STAIRS_DOWN, EntityType.STAIRS_UP, EntityType.AMULET}]:
                 tile = {
                     EntityType.ITEM: {
-                        'Healing Potion': TILE_POTION,
-                        'Lightning Scroll': TILE_SCROLL,
-                        'Fireball Scroll': TILE_SCROLL,
-                        'Confusion Scroll': TILE_SCROLL,
-                        'Teleport Scroll': TILE_SCROLL,
-                        'Scroll of Identify': TILE_SCROLL,
-                    }.get(entity.name, TILE_SCROLL),
-                    EntityType.GOLD: TILE_GOLD,
-                    EntityType.STAIRS_DOWN: TILE_STAIRS_DOWN,
-                    EntityType.STAIRS_UP: TILE_STAIRS_UP,
-                    EntityType.AMULET: TILE_AMULET,
-                    EntityType.WEAPON: TILE_WEAPON,
-                    EntityType.RANGED: TILE_BOW,
-                    EntityType.AMMO: TILE_ARROW,
-                    EntityType.FOOD: TILE_FOOD,
+                        'Healing Potion': POTION_CHAR,
+                        'Lightning Scroll': SCROLL_CHAR,
+                        'Fireball Scroll': SCROLL_CHAR,
+                        'Confusion Scroll': SCROLL_CHAR,
+                        'Teleport Scroll': SCROLL_CHAR,
+                        'Scroll of Identify': SCROLL_CHAR,
+                    }.get(entity.name, SCROLL_CHAR),
+                    EntityType.GOLD: GOLD_CHAR,
+                    EntityType.STAIRS_DOWN: STAIRS_DOWN_CHAR,
+                    EntityType.STAIRS_UP: STAIRS_UP_CHAR,
+                    EntityType.AMULET: AMULET_CHAR,
+                    EntityType.WEAPON: WEAPON_CHAR,
+                    EntityType.RANGED: BOW_CHAR,
+                    EntityType.AMMO: ARROW_CHAR,
+                    EntityType.FOOD: FOOD_CHAR,
                 }[entity.entity_type]
                 
-                root_console.tiles_rgb[entity.x, entity.y]["ch"] = tile
-                root_console.tiles_rgb[entity.x, entity.y]["fg"] = entity.color
+                root_console.print(x=entity.x, y=entity.y, string=tile, fg=entity.color)
             
             for entity in [e for e in entities if e.entity_type == EntityType.MONSTER]:
-                tile = TILE_TROLL if entity.name == 'Troll' else TILE_ORC
-                root_console.tiles_rgb[entity.x, entity.y]["ch"] = tile
-                root_console.tiles_rgb[entity.x, entity.y]["fg"] = entity.color
+                tile = TROLL_CHAR if entity.name == 'Troll' else ORC_CHAR
+                root_console.print(x=entity.x, y=entity.y, string=tile, fg=entity.color)
             
             # プレイヤーは最後に描画
             for entity in [e for e in entities if e.entity_type == EntityType.PLAYER]:
-                root_console.tiles_rgb[entity.x, entity.y]["ch"] = TILE_PLAYER
-                root_console.tiles_rgb[entity.x, entity.y]["fg"] = entity.color
+                root_console.print(x=entity.x, y=entity.y, string=PLAYER_CHAR, fg=entity.color)
 
             # 階層情報を表示
             root_console.print(x=0, y=34, string=f"Level: {game_map.dungeon_level}")
