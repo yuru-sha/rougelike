@@ -277,7 +277,7 @@ class Game:
             self.entities.remove(monster)
             # 経験値を獲得
             if monster.xp_given:
-                self.player.xp += monster.xp_given
+                self.player._add_xp(monster.xp_given)
 
     def _roll_damage(self, damage_dice: Tuple[int, int]) -> int:
         """

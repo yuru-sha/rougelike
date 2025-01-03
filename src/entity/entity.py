@@ -350,6 +350,65 @@ class Entity:
         dy = other.y - self.y
         return (dx ** 2 + dy ** 2) ** 0.5
 
+    def _add_xp(self, amount: int) -> None:
+        """
+        経験値を追加し、レベルアップの条件を満たしているかチェックする
+        オリジナルRogueの経験値テーブルに準拠：
+        Lv1:    0 XP (初期値)
+        Lv2:   10 XP
+        Lv3:   20 XP
+        Lv4:   40 XP
+        Lv5:   80 XP
+        Lv6:  160 XP
+        Lv7:  320 XP
+        Lv8:  640 XP
+        Lv9: 1280 XP
+        以降、同様に倍増
+        """
+        self.xp += amount
+        xp_needed = 10  # Lv2に必要な経験値
+
+        # 現在のレベルまでに必要な経験値を計算
+        for level in range(2, self.level + 1):
+            xp_needed *= 2
+
+        # レベルアップチェック
+        while self.xp >= xp_needed:
+            self.level += 1
+            self._level_up()
+            xp_needed *= 2
+
+    def _level_up(self) -> None:
+        """
+        レベルアップ時の処理（オリジナルRogueに準拠）
+        - HPは(4,8)の範囲でランダムに増加
+        - 筋力は18までは50%の確率で1上昇
+        - 筋力は19以上は10%の確率で1上昇（最大25まで）
+        """
+        import random
+        
+        # HP増加 (4-8)
+        hp_increase = random.randint(4, 8)
+        self.max_hp += hp_increase
+        self.hp = self.max_hp  # HPを全回復
+        
+        # 筋力増加
+        if self.strength < 18 and random.random() < 0.5:
+            self.strength += 1
+        elif 18 <= self.strength < 25 and random.random() < 0.1:
+            self.strength += 1
+        
+        # 基本攻撃力の増加（レベルに応じて）
+        if isinstance(self.power, tuple):
+            min_damage, max_damage = self.power
+            # レベル3,5,7,9ごとに最小ダメージ+1
+            if self.level % 2 == 1 and self.level > 1:
+                min_damage += 1
+            # レベル2,4,6,8ごとに最大ダメージ+1
+            if self.level % 2 == 0:
+                max_damage += 1
+            self.power = (min_damage, max_damage)
+
     def _move_towards(self, target_x: int, target_y: int, game_map: "GameMap", entities: List["Entity"]) -> None:
         dx = target_x - self.x
         dy = target_y - self.y

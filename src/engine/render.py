@@ -43,7 +43,7 @@ class Renderer:
         )
 
     def _render_ui(self, player: Entity) -> None:
-        # ステータスバーの背景（上部1行）
+        # ステータスバーの背景（1行目）
         for x in range(SCREEN_WIDTH):
             self.console.print(x, 0, ' ', (255, 255, 255), (0, 0, 0))
 
@@ -59,16 +59,16 @@ class Renderer:
         )
         
         self.console.print(
-            1, 0,  # 上部1行目に表示
+            1, 0,  # 1行目に表示
             status_text,
             (255, 255, 255),
             (0, 0, 0),
             alignment=libtcodpy.LEFT
         )
 
-        # メッセージ領域の背景（下部3行）
+        # メッセージ領域の背景（48-50行目）
         for x in range(SCREEN_WIDTH):
-            for y in range(MAP_HEIGHT, SCREEN_HEIGHT):
+            for y in range(47, SCREEN_HEIGHT):
                 self.console.print(x, y, ' ', (255, 255, 255), (0, 0, 0))
 
     def clear_all(self, entities: List[Entity]) -> None:

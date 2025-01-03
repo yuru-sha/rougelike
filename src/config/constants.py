@@ -5,9 +5,9 @@ from typing import Dict, Tuple
 SCREEN_WIDTH = 80
 SCREEN_HEIGHT = 50
 MAP_WIDTH = 80
-MAP_HEIGHT = 46  # マップ表示領域
-STATUS_HEIGHT = 1  # ステータスバー（上部）
-MESSAGE_HEIGHT = 3  # メッセージ領域（下部）
+MAP_HEIGHT = 45  # マップ表示領域（2-47行目）
+STATUS_HEIGHT = 1  # ステータスバー（1行目）
+MESSAGE_HEIGHT = 3  # メッセージ領域（48-50行目）
 ROOM_MAX_SIZE = 8  # Rogueの部屋サイズ
 ROOM_MIN_SIZE = 4  # Rogueの部屋サイズ
 MAX_ROOMS = 9  # Rogueの部屋数
