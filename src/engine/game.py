@@ -22,6 +22,7 @@ class Game:
         self.game_map = GameMap(MAP_WIDTH, MAP_HEIGHT, 1)
         self.game_map.make_map(self.player, self.entities)
         self._equip_player(self.player)
+        self.game_map.compute_fov(self.player.x, self.player.y, self.player.sight_radius)
 
     def _create_player(self) -> Entity:
         player = Entity(
@@ -238,6 +239,9 @@ class Game:
             # 移動先のアイテムを自動取得
             self._auto_pickup()
 
+            # FOVを更新
+            self.game_map.compute_fov(self.player.x, self.player.y, self.player.sight_radius)
+
     def _auto_pickup(self) -> None:
         # プレイヤーの位置にあるゴールドを探す
         for entity in list(self.entities):  # リストのコピーを作成して反復
@@ -384,7 +388,9 @@ class Game:
         self.player.dungeon_level = new_level
         self.entities = [self.player]
         self.game_map = GameMap(MAP_WIDTH, MAP_HEIGHT, new_level)
-        self.game_map.make_map(self.player, self.entities) 
+        self.game_map.make_map(self.player, self.entities)
+        # 新しい階層でFOVを計算
+        self.game_map.compute_fov(self.player.x, self.player.y, self.player.sight_radius)
 
     def _render_inventory(self, console: tcod.console.Console) -> None:
         # インベントリウィンドウの位置とサイズ

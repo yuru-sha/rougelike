@@ -9,8 +9,13 @@ from config.constants import SCREEN_WIDTH, SCREEN_HEIGHT, MAP_HEIGHT
 class Renderer:
     def __init__(self, console: tcod.console.Console):
         self.console = console
+        self.game_map = None
 
     def render_all(self, entities: List[Entity], game_map: GameMap, player: Entity) -> None:
+        # コンソールを完全にクリア
+        self.console.clear()
+        
+        self.game_map = game_map  # game_mapを保存
         self._render_map(game_map)
         self._render_entities(entities)
         self._render_ui(player)
@@ -18,11 +23,23 @@ class Renderer:
     def _render_map(self, game_map: GameMap) -> None:
         for y in range(game_map.height):
             for x in range(game_map.width):
+                visible = game_map.visible[x][y]
+                explored = game_map.explored[x][y]
+
+                if not visible and not explored:
+                    continue
+
                 wall = not game_map.tiles[x][y].transparent
                 if wall:
-                    self.console.print(x, y + 1, '#', (255, 255, 255), (0, 0, 0))
+                    if visible:
+                        self.console.print(x, y + 1, '#', (255, 255, 255), (0, 0, 0))
+                    elif explored:
+                        self.console.print(x, y + 1, '#', (128, 128, 128), (0, 0, 0))
                 else:
-                    self.console.print(x, y + 1, '.', (95, 95, 95), (0, 0, 0))
+                    if visible:
+                        self.console.print(x, y + 1, '.', (192, 192, 192), (0, 0, 0))
+                    elif explored:
+                        self.console.print(x, y + 1, '.', (64, 64, 64), (0, 0, 0))
 
     def _render_entities(self, entities: List[Entity]) -> None:
         # エンティティを描画順にソート
@@ -32,7 +49,9 @@ class Renderer:
         )
 
         for entity in entities_in_render_order:
-            self._draw_entity(entity)
+            # プレイヤーは常に表示、それ以外は可視タイルにいる場合のみ表示
+            if entity.entity_type == EntityType.PLAYER or self.game_map.visible[entity.x][entity.y]:
+                self._draw_entity(entity)
 
     def _draw_entity(self, entity: Entity) -> None:
         self.console.print(

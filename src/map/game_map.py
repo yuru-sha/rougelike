@@ -22,6 +22,8 @@ class GameMap:
         self.height = height
         self.dungeon_level = dungeon_level
         self.tiles = self._initialize_tiles()
+        self.visible = [[False for y in range(height)] for x in range(width)]
+        self.explored = [[False for y in range(height)] for x in range(width)]
     
     def _initialize_tiles(self) -> List[List[Tile]]:
         return [[Tile(walkable=False, transparent=False)
@@ -229,25 +231,28 @@ class GameMap:
                 entities.append(gold)
 
     def make_map(self, player: Entity, entities: List[Entity]) -> None:
-        rooms: List[Rectangle] = []
+        self.rooms: List[Rectangle] = []
 
         for _ in range(MAX_ROOMS):
             room = self._create_random_room()
             
-            if not any(room.intersects(other_room) for other_room in rooms):
+            if not any(room.intersects(other_room) for other_room in self.rooms):
                 self._create_room(room)
                 new_x, new_y = room.center
                 
-                if not rooms:
+                if not self.rooms:
+                    # プレイヤーを最初の部屋の中心に配置
                     player.x, player.y = new_x, new_y
+                    # 初期FOVを計算
+                    self.compute_fov(player.x, player.y, player.sight_radius)
                 else:
-                    prev_x, prev_y = rooms[-1].center
+                    prev_x, prev_y = self.rooms[-1].center
                     self._connect_rooms(prev_x, prev_y, new_x, new_y)
                 
                 self._place_entities(room, entities)
-                rooms.append(room)
+                self.rooms.append(room)
 
-        self._place_special_entities(rooms, player, entities)
+        self._place_special_entities(self.rooms, player, entities)
 
     def _create_random_room(self) -> Rectangle:
         w = random.randint(ROOM_MIN_SIZE, ROOM_MAX_SIZE)
@@ -362,3 +367,55 @@ class GameMap:
         equipment.append(food)
 
         return equipment 
+
+    def compute_fov(self, x: int, y: int, radius: int) -> None:
+        """プレイヤーの視界を計算（Rogueスタイル）"""
+        # 一旦全てのタイルを不可視に
+        for i in range(self.width):
+            for j in range(self.height):
+                self.visible[i][j] = False
+
+        # プレイヤーのいる部屋を見つける
+        current_room = None
+        for room in self.rooms:
+            if (room.x1 < x < room.x2 and room.y1 < y < room.y2):
+                current_room = room
+                break
+
+        if current_room:
+            # 部屋の中にいる場合
+            # 部屋全体を可視に
+            for i in range(current_room.x1, current_room.x2 + 1):
+                for j in range(current_room.y1, current_room.y2 + 1):
+                    if 0 <= i < self.width and 0 <= j < self.height:
+                        self.visible[i][j] = True
+                        self.explored[i][j] = True
+            
+            # 部屋の周囲1マスも可視に（ドアや通路の入り口を見えるように）
+            for i in range(current_room.x1 - 1, current_room.x2 + 2):
+                for j in range(current_room.y1 - 1, current_room.y2 + 2):
+                    if 0 <= i < self.width and 0 <= j < self.height:
+                        if self.tiles[i][j].walkable:
+                            self.visible[i][j] = True
+                            self.explored[i][j] = True
+        else:
+            # 通路にいる場合
+            # プレイヤーの位置を可視に
+            self.visible[x][y] = True
+            self.explored[x][y] = True
+
+            # 前後左右の1マスを可視に
+            directions = [(0, -1), (0, 1), (-1, 0), (1, 0)]
+            for dx, dy in directions:
+                new_x, new_y = x + dx, y + dy
+                if 0 <= new_x < self.width and 0 <= new_y < self.height:
+                    self.visible[new_x][new_y] = True
+                    self.explored[new_x][new_y] = True
+                    
+                    # 通路の先に部屋があれば、その入り口も見える
+                    if self.tiles[new_x][new_y].walkable:
+                        for room in self.rooms:
+                            if (room.x1 - 1 <= new_x <= room.x2 + 1 and 
+                                room.y1 - 1 <= new_y <= room.y2 + 1):
+                                self.visible[new_x][new_y] = True
+                                self.explored[new_x][new_y] = True 
