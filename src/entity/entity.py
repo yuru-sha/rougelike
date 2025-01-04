@@ -195,6 +195,15 @@ class Entity:
 
         self.hp = max(0, self.hp - amount)  # HPが0未満にならないようにする
 
+        # HPが0になった場合の処理
+        if self.hp <= 0:
+            if self.entity_type == EntityType.PLAYER:
+                from engine.game import Game
+                Game.instance.add_message(MESSAGES["death"])
+            elif self.entity_type == EntityType.MONSTER:
+                from engine.game import Game
+                Game.instance.add_message(f"{self.name} {MESSAGES['monster_death']}")
+
     def drop_item(self, item: "Entity", entities: List["Entity"]) -> None:
         self.inventory.remove(item)
         item.x = self.x
@@ -422,7 +431,11 @@ class Entity:
         - 筋力は18までは50%の確率で1上昇
         - 筋力は19以上は10%の確率で1上昇（最大25まで）
         """
+        from engine.game import Game  # 循環参照を避けるためにローカルインポート
         import random
+
+        # レベルアップメッセージ
+        Game.instance.add_message(MESSAGES["level_up"].format(self.level))
 
         # HP増加 (4-8)
         hp_increase = random.randint(4, 8)
@@ -430,10 +443,15 @@ class Entity:
         self.hp = self.max_hp  # HPを全回復
 
         # 筋力増加
+        old_strength = self.strength
         if self.strength < 18 and random.random() < 0.5:
             self.strength += 1
         elif 18 <= self.strength < 25 and random.random() < 0.1:
             self.strength += 1
+
+        # 筋力が上がった場合はメッセージを表示
+        if self.strength > old_strength:
+            Game.instance.add_message(MESSAGES["strength_up"].format(self.strength))
 
         # 基本攻撃力の増加（レベルに応じて）
         if isinstance(self.power, tuple):
@@ -463,6 +481,8 @@ class Entity:
         self.move(dx, dy, game_map, entities)
 
     def attack(self, target: "Entity", entities: List["Entity"]) -> None:
+        from engine.game import Game  # 循環参照を避けるためにローカルインポート
+
         # 武器のダメージを計算
         damage = 1  # 素手の場合のデフォルトダメージ
         hit_bonus = 0
@@ -492,6 +512,11 @@ class Entity:
             damage += random.randint(3, 6)
 
         # 攻撃の実行
+        if self.entity_type == EntityType.MONSTER:
+            # モンスターの攻撃メッセージ
+            Game.instance.add_message(MESSAGES["monster_attack"].format(self.name))
+            Game.instance.add_message(MESSAGES["monster_damage"].format(self.name, damage))
+
         target.take_damage(damage)
 
         # 死亡判定
@@ -500,62 +525,6 @@ class Entity:
                 entities.remove(target)
                 if self.entity_type == EntityType.PLAYER:
                     self._add_xp(target.xp_given)
-
-    def _add_xp(self, amount: int) -> None:
-        """
-        経験値を追加し、レベルアップの条件を満たしているかチェックする
-        オリジナルRogueの経験値テーブルに準拠：
-        Lv1:    0 XP (初期値)
-        Lv2:   10 XP
-        Lv3:   20 XP
-        Lv4:   40 XP
-        Lv5:   80 XP
-        Lv6:  160 XP
-        Lv7:  320 XP
-        Lv8:  640 XP
-        Lv9: 1280 XP
-        以降、同様に倍増
-        """
-        self.xp += amount
-        xp_needed = 10  # Lv2に必要な経験値
-
-        # 現在のレベルまでに必要な経験値を計算
-        for level in range(2, self.level + 1):
-            xp_needed *= 2
-
-        # レベルアップチェック
-        while self.xp >= xp_needed:
-            self.level += 1
-            self._level_up()
-            xp_needed *= 2
-
-    def _level_up(self) -> None:
-        """
-        レベルアップ時の処理（オリジナルRogueに準拠）
-        - HPは(4,8)の範囲でランダムに増加
-        - 筋力は18までは50%の確率で1上昇
-        - 筋力は19以上は10%の確率で1上昇（最大25まで）
-        """
-        import random
-
-        # HP増加 (4-8)
-        hp_increase = random.randint(4, 8)
-        self.max_hp += hp_increase
-        self.hp = self.max_hp  # HPを全回復
-
-        # 筋力増加
-        if self.strength < 18 and random.random() < 0.5:
-            self.strength += 1
-        elif 18 <= self.strength < 25 and random.random() < 0.1:
-            self.strength += 1
-
-        # 基本攻撃力の増加（レベルに応じて）
-        if isinstance(self.power, tuple):
-            min_damage, max_damage = self.power
-            # レベル3,5,7,9ごとに最小ダメージ+1
-            if self.level % 2 == 1 and self.level > 1:
-                min_damage += 1
-            # レベル2,4,6,8ごとに最大ダメージ+1
-            if self.level % 2 == 0:
-                max_damage += 1
-            self.power = (min_damage, max_damage)
+                    Game.instance.add_message(f"{target.name} {MESSAGES['monster_death']}")
+            elif target.entity_type == EntityType.PLAYER:
+                Game.instance.add_message(MESSAGES["death"])

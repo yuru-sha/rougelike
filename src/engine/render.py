@@ -79,13 +79,22 @@ class Renderer:
         Args:
             entities: List of entities to render.
         """
-        # Sort entities by render order
-        entities_in_render_order = sorted(
-            entities, key=lambda x: 1 if x.entity_type == EntityType.PLAYER else 0
-        )
+        # エンティティを描画順序でソート
+        # 1. アイテム（最背面）
+        # 2. モンスター
+        # 3. プレイヤー（最前面）
+        def get_render_order(entity: Entity) -> int:
+            if entity.entity_type == EntityType.PLAYER:
+                return 3
+            elif entity.entity_type == EntityType.MONSTER:
+                return 2
+            else:
+                return 1
+
+        entities_in_render_order = sorted(entities, key=get_render_order)
 
         for entity in entities_in_render_order:
-            # Player is always visible, others only when in FOV
+            # プレイヤーは常に表示、他のエンティティはFOV内のみ表示
             if (
                 entity.entity_type == EntityType.PLAYER
                 or self.game_map.visible[entity.x][entity.y]

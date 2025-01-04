@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from typing import List, Optional, Tuple
 import tcod
+import random
 from tcod.event import KeySym
 from entity.entity import Entity, EntityType
 from map.game_map import GameMap
@@ -29,7 +30,10 @@ from config.items import MELEE_WEAPONS, RANGED_WEAPONS, AMMO, FOODS
 
 
 class Game:
+    instance = None  # シングルトンインスタンス
+
     def __init__(self):
+        Game.instance = self  # インスタンスを保存
         self.logger = setup_logger("game")
         self.logger.info("Game initializing...")
 
@@ -184,6 +188,12 @@ class Game:
 
                 renderer.clear_all(self.entities)
 
+                # プレイヤーが死亡している場合はゲームを終了
+                if self.player.hp <= 0:
+                    self.add_message(MESSAGES["death"])
+                    context.present(console)  # 最後のメッセージを表示
+                    return
+
                 for event in tcod.event.wait():
                     action = self._handle_input(event)
                     if action:
@@ -262,6 +272,10 @@ class Game:
             dx: The change in x-coordinate.
             dy: The change in y-coordinate.
         """
+        # プレイヤーが死亡している場合は何もしない
+        if self.player.hp <= 0:
+            return
+
         new_x = self.player.x + dx
         new_y = self.player.y + dy
 
@@ -310,46 +324,56 @@ class Game:
                 and entity.y == self.player.y
                 and entity.entity_type == EntityType.GOLD
             ):
-                # Add gold to player's purse
+                # Add gold to player's purse and show message
                 self.player.gold += entity.gold_amount
+                self.add_message(MESSAGES["gold_picked"].format(entity.gold_amount))
                 self.entities.remove(entity)
 
-    def _attack_monster(self, monster: Entity) -> None:
-        """Handle player's attack against a monster.
+    def _collect_gold(self, gold: Entity, entities: List[Entity]) -> None:
+        self.player.gold += gold.gold_amount
+        self.add_message(MESSAGES["gold_picked"].format(gold.gold_amount))
+        entities.remove(gold)
 
-        Args:
-            monster: The monster entity being attacked.
-        """
-        # Find player's equipped weapon
-        weapon = None
-        for item in self.player.inventory:
-            if item.entity_type == EntityType.WEAPON:
-                weapon = item
-                break
+    def add_message(self, message: str) -> None:
+        """メッセージをゲームのメッセージログに追加する"""
+        self.messages.append(message)
+        if len(self.messages) > 100:  # メッセージ履歴の上限
+            self.messages.pop(0)
 
-        # Calculate base damage
-        damage = self._roll_damage(self.player.power)
+    def _attack_monster(self, target: Entity) -> None:
+        """プレイヤーがモンスターを攻撃する"""
+        # 攻撃メッセージを生成
+        self.add_message(MESSAGES["player_attack"].format(target.name))
+        
+        # 装備中の武器を探す
+        weapon = next(
+            (item for item in self.player.inventory if item.entity_type == EntityType.WEAPON),
+            None,
+        )
 
-        # Add weapon damage
-        if weapon and weapon.damage_dice:
-            weapon_damage = self._roll_damage(weapon.damage_dice)
-            damage += weapon_damage
+        # ダメージ計算
+        damage = self._calculate_damage(
+            self.player.power if not weapon else weapon.damage_dice
+        )
 
-            # Apply hit bonus
-            if weapon.hit_bonus:
-                damage += weapon.hit_bonus
+        # クリティカルヒットの判定（10%の確率）
+        if random.random() < 0.1:
+            damage *= 2
+            self.add_message(MESSAGES["player_crit"].format(target.name))
 
-        # Apply damage
-        monster.take_damage(damage)
+        # ダメージメッセージを表示
+        self.add_message(MESSAGES["player_damage"].format(target.name, damage))
 
-        # Check if monster is defeated
-        if monster.hp <= 0:
-            self.entities.remove(monster)
-            # Award experience points
-            if monster.xp_given:
-                self.player._add_xp(monster.xp_given)
+        # ダメージを与える
+        target.take_damage(damage)
 
-    def _roll_damage(self, damage_dice: Tuple[int, int]) -> int:
+        # モンスターが死亡した場合
+        if target.hp <= 0:
+            self.add_message(f"{target.name} {MESSAGES['monster_death']}")
+            self.entities.remove(target)
+            self.player._add_xp(target.xp_given)
+
+    def _calculate_damage(self, damage_dice: Tuple[int, int]) -> int:
         """Roll damage based on dice configuration.
 
         Args:
@@ -364,6 +388,10 @@ class Game:
         return base_damage + random.randint(1, dice)
 
     def _process_monster_turns(self) -> None:
+        # プレイヤーが死亡している場合はモンスターのターンを処理しない
+        if self.player.hp <= 0:
+            return
+
         for entity in self.entities:
             if entity.entity_type == EntityType.MONSTER and entity.hp > 0:
                 entity.take_turn(self.player, self.game_map, self.entities)
@@ -446,7 +474,7 @@ class Game:
             return True
 
         if self.player.hp <= 0:
-            print(MESSAGES["death"])
+            self.add_message(MESSAGES["death"])
             return True
 
         for entity in self.entities:
@@ -455,20 +483,28 @@ class Game:
                 and entity.x == self.player.x
                 and entity.y == self.player.y
             ):
-                print(MESSAGES["victory"])
+                self.add_message(MESSAGES["victory"])
                 return True
 
         return False
 
     def _change_level(self, new_level: int) -> None:
+        # 階層移動メッセージを表示
+        self.add_message(MESSAGES["welcome_level"].format(new_level))
+
         self.player.dungeon_level = new_level
         self.entities = [self.player]
         self.game_map = GameMap(MAP_WIDTH, MAP_HEIGHT, new_level)
         self.game_map.make_map(self.player, self.entities)
+
         # 新しい階層でFOVを計算
         self.game_map.compute_fov(
             self.player.x, self.player.y, self.player.sight_radius
         )
+
+        # アミュレットが近くにある場合のメッセージ（26階のみ）
+        if new_level == 26:
+            self.add_message(MESSAGES["amulet_nearby"])
 
     def _render_inventory(self, console: tcod.console.Console) -> None:
         # Set inventory window position and size
